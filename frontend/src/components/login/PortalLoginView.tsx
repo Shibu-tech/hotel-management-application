@@ -197,7 +197,18 @@ const FULFILLER_DEPARTMENTS: { key: FulfillerDeptKey; name: string }[] = [
   { key: 'fnb', name: 'Food & Beverages' },
 ];
 
-export function PortalLoginView() {
+export interface LockedHotelInfo {
+  id: number;
+  name: string;
+  slug: string;
+  active: boolean;
+}
+
+export interface PortalLoginViewProps {
+  lockedHotel?: LockedHotelInfo;
+}
+
+export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
   const router = useRouter();
   const { state, setTheme, setPersona, setActiveDispatcherDept } = useDemo();
   const { t } = useI18n();
@@ -690,6 +701,36 @@ export function PortalLoginView() {
                   </span>
                 </div>
               </div>
+
+              {/* Scanned QR Verified Hotel Banner */}
+              {lockedHotel && (
+                <div
+                  className={`mb-5 p-3.5 rounded-2xl border flex items-center justify-between gap-3 animate-in fade-in duration-200 ${
+                    isLight
+                      ? 'bg-amber-50/90 border-amber-200/90 text-amber-950'
+                      : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center font-bold flex-shrink-0">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        Scanned Property Portal
+                      </div>
+                      <div className="font-bold text-xs sm:text-sm">
+                        {lockedHotel.name}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400">
+                      Hotel ID #{lockedHotel.id}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Error Alert */}
               {authError && (

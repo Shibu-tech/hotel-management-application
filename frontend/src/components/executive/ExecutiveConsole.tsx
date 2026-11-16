@@ -24,6 +24,7 @@ import {
   X,
   Layers,
   Wrench,
+  QrCode,
 } from 'lucide-react';
 import { ExecutiveOverviewTab } from '@/components/executive/ExecutiveOverviewTab';
 import { ExecutivePerformanceTab } from '@/components/executive/ExecutivePerformanceTab';
@@ -34,6 +35,7 @@ import { ExecutiveAuditTab } from '@/components/executive/ExecutiveAuditTab';
 import { GeneralManagerVipTab } from '@/components/executive/GeneralManagerVipTab';
 import { GeneralManagerRoomsTab } from '@/components/executive/GeneralManagerRoomsTab';
 import { GeneralManagerBroadcastTab } from '@/components/executive/GeneralManagerBroadcastTab';
+import { GeneralManagerQrTab } from '@/components/executive/GeneralManagerQrTab';
 import { StaffRosterTab } from '@/components/executive/StaffRosterTab';
 import { AdminDiningTab } from '@/components/executive/AdminDiningTab';
 import { WorkflowConfigTab } from '@/components/executive/WorkflowConfigTab';
@@ -44,6 +46,7 @@ import type { WorkItem, InAppNotification } from '@/types/demo';
 
 export type ExecutiveTabId =
   | 'overview'
+  | 'my-hotel-qr'
   | 'rooms'
   | 'vip'
   | 'staff-rbac'
@@ -223,6 +226,12 @@ export function ExecutiveConsole() {
       label: 'Executive Dashboard',
       shortLabel: 'Dashboard',
       icon: Gauge,
+    },
+    {
+      id: 'my-hotel-qr',
+      label: 'My Hotel QR Code',
+      shortLabel: 'Hotel QR',
+      icon: QrCode,
     },
     {
       id: 'rooms',
@@ -893,6 +902,9 @@ export function ExecutiveConsole() {
               onNavigateTab={handleNavigateTab}
             />
           )}
+
+          {/* MY HOTEL QR CODE */}
+          {activeTab === 'my-hotel-qr' && <GeneralManagerQrTab />}
 
           {/* 2. HOTEL-WIDE ROOM MATRIX */}
           {activeTab === 'rooms' && <GeneralManagerRoomsTab />}
