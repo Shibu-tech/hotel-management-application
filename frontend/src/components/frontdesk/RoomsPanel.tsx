@@ -98,7 +98,7 @@ export interface RoomTileData {
 }
 
 export function RoomsPanel() {
-  const { state } = useDemo();
+  const { state, currentHotelSlug } = useDemo();
 
   const [activeStatusFilter, setActiveStatusFilter] = useState<StatusFilterId>('all');
   const [cleaningSubfilter, setCleaningSubfilter] = useState<CleaningSubfilter>('all');
@@ -135,10 +135,10 @@ export function RoomsPanel() {
   const stays = state.frontDesk?.stays ?? [];
   const stateRooms = state.frontDesk?.rooms ?? [];
 
-  // Compute live rooms and floors dynamically from store
+  // Compute live rooms and floors dynamically from store scoped to current hotel
   const { allRooms, floors: activeFloors, floorInfo: activeFloorInfo } = useMemo(() => {
-    return getComputedRoomsAndFloors(state, roomOverrides);
-  }, [state, roomOverrides]);
+    return getComputedRoomsAndFloors(state, roomOverrides, currentHotelSlug);
+  }, [state, roomOverrides, currentHotelSlug]);
 
   const floorsList = activeFloors;
 
@@ -388,6 +388,15 @@ export function RoomsPanel() {
               Floor {fl}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setIsManageModalOpen(true)}
+            className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shrink-0 cursor-pointer whitespace-nowrap"
+            title="Manage rooms and floors"
+          >
+            <SlidersHorizontal className="h-3 w-3" />
+            <span>Manage</span>
+          </button>
         </div>
       </div>
 
@@ -524,66 +533,70 @@ export function RoomsPanel() {
       {/* 2. MIDDLE COLUMN: Inventory Matrix Room Grid (Matching Design) */}
       {/* ============================================================== */}
       <div className="flex-1 min-w-0 h-auto lg:h-full flex flex-col rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-white/10 bg-[#f8fafc]/80 dark:bg-ink-900/60 p-3 sm:p-5 shadow-lg overflow-visible lg:overflow-hidden backdrop-blur-sm">
-        {/* Horizontal Floor Filter Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 shrink-0 scrollbar-none">
-          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-semibold text-xs shrink-0 mr-1">
-            <Layers className="h-4 w-4 text-amber-500" />
-            <span>Floor:</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSelectedFloorFilter('all')}
-            className={cn(
-              'rounded-full px-4 py-1.5 text-xs font-bold transition shrink-0 cursor-pointer',
-              selectedFloorFilter === 'all'
-                ? 'bg-amber-500 text-white shadow-sm'
-                : 'bg-slate-200/80 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
-            )}
-          >
-            All Floors
-          </button>
-          {activeFloors.map((fl) => (
+        {/* Horizontal Floor Filter Bar & Manage Button */}
+        <div className="flex items-center justify-between gap-2.5 pb-2 shrink-0 border-b border-slate-200/80 dark:border-white/5">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-w-0 py-0.5">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-semibold text-xs shrink-0 mr-1">
+              <Layers className="h-4 w-4 text-amber-500" />
+              <span>Floor:</span>
+            </div>
             <button
-              key={fl}
               type="button"
-              onClick={() => setSelectedFloorFilter(fl)}
+              onClick={() => setSelectedFloorFilter('all')}
               className={cn(
                 'rounded-full px-4 py-1.5 text-xs font-bold transition shrink-0 cursor-pointer',
-                selectedFloorFilter === fl
+                selectedFloorFilter === 'all'
                   ? 'bg-amber-500 text-white shadow-sm'
                   : 'bg-slate-200/80 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
               )}
             >
-              Floor {fl}
+              All Floors
             </button>
-          ))}
+            {activeFloors.map((fl) => (
+              <button
+                key={fl}
+                type="button"
+                onClick={() => setSelectedFloorFilter(fl)}
+                className={cn(
+                  'rounded-full px-4 py-1.5 text-xs font-bold transition shrink-0 cursor-pointer',
+                  selectedFloorFilter === fl
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-slate-200/80 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                )}
+              >
+                Floor {fl}
+              </button>
+            ))}
 
-          {/* Reset Filters Shortcut if active */}
-          {(activeStatusFilter !== 'all' || selectedFloorFilter !== 'all' || searchQuery) && (
+            {/* Reset Filters Shortcut if active */}
+            {(activeStatusFilter !== 'all' || selectedFloorFilter !== 'all' || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveStatusFilter('all');
+                  setCleaningSubfilter('all');
+                  setSelectedFloorFilter('all');
+                  setSearchQuery('');
+                }}
+                className="text-xs text-amber-500 hover:text-amber-400 flex items-center gap-1 font-semibold shrink-0 cursor-pointer pl-1 whitespace-nowrap"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset
+              </button>
+            )}
+          </div>
+
+          {/* Minimal Manage Rooms & Floors button - Always visible on right side */}
+          <div className="shrink-0 pl-1">
             <button
               type="button"
-              onClick={() => {
-                setActiveStatusFilter('all');
-                setCleaningSubfilter('all');
-                setSelectedFloorFilter('all');
-                setSearchQuery('');
-              }}
-              className="ml-auto text-xs text-amber-500 hover:text-amber-400 flex items-center gap-1 font-semibold shrink-0 cursor-pointer pl-2"
+              onClick={() => setIsManageModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 active:scale-95 transition-all cursor-pointer shadow-xs whitespace-nowrap"
+              title="Add or remove rooms and floors"
             >
-              <RotateCcw className="h-3 w-3" /> Reset
+              <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500" />
+              <span>Manage Rooms</span>
             </button>
-          )}
-
-          {/* Minimal Manage Rooms & Floors button */}
-          <button
-            type="button"
-            onClick={() => setIsManageModalOpen(true)}
-            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 active:scale-95 transition-all shrink-0 cursor-pointer shadow-2xs"
-            title="Add or remove rooms and floors"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span>Manage Rooms</span>
-          </button>
+          </div>
         </div>
 
         {/* Subfilter Bar for Dirty / Cleaning if active */}
@@ -1513,6 +1526,12 @@ export function RoomsPanel() {
           </div>
         </Modal>
       )}
+
+      {/* Dynamic Floor & Room Management Modal */}
+      <ManageRoomsModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+      />
     </div>
   );
 }
