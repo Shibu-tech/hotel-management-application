@@ -1,0 +1,13 @@
+{
+  "name": "hotel-management-application",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hotel Management Application Monorepo (Next.js frontend & Spring Boot backend)",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:turbo": "npm --prefix frontend run dev:turbo",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "install:frontend": "npm --prefix frontend install"
+  }
+}

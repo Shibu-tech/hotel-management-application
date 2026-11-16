@@ -1,0 +1,556 @@
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import {
+  LayoutDashboard,
+  Layers,
+  ClipboardCheck,
+  BedDouble,
+  Users,
+  Sparkles,
+  Clock,
+  Repeat,
+  ShieldCheck,
+  BarChart3,
+  History,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  AlertTriangle,
+  Flame,
+  MessageSquare,
+  MessageSquareWarning,
+  HeartPulse,
+  UtensilsCrossed,
+} from 'lucide-react';
+import { useDemo } from '@/lib/store';
+import type { SupervisorInspection, RoleId, DispatcherDepartment, WorkItem, StaffAccount } from '@/types/demo';
+
+// Dispatcher Tabs
+import { DispatcherSupervisorOverviewTab } from './DispatcherSupervisorOverviewTab';
+import { DispatcherQueueTab } from '@/components/dispatcher/DispatcherQueueTab';
+import { DispatcherWorkloadTab } from '@/components/dispatcher/DispatcherWorkloadTab';
+import { DispatcherRoutingTab } from '@/components/dispatcher/DispatcherRoutingTab';
+import { DispatcherSlaTab } from '@/components/dispatcher/DispatcherSlaTab';
+import { DispatcherReportsTab } from '@/components/dispatcher/DispatcherReportsTab';
+import { DispatcherBlockersTab } from '@/components/dispatcher/DispatcherBlockersTab';
+import { DispatcherEscalationsTab } from '@/components/dispatcher/DispatcherEscalationsTab';
+import { DispatcherMenuOrdersTab } from '@/components/dispatcher/DispatcherMenuOrdersTab';
+import { DispatcherPoliciesTab } from '@/components/dispatcher/DispatcherPoliciesTab';
+
+// Supervisor Tabs
+import { SupervisorRoomsTab } from '@/components/supervisor/SupervisorRoomsTab';
+import { SupervisorMedicalTherapyTab } from '@/components/supervisor/SupervisorMedicalTherapyTab';
+import { SupervisorAuditTab } from '@/components/supervisor/SupervisorAuditTab';
+import { SupervisorNotificationsTab } from '@/components/supervisor/SupervisorNotificationsTab';
+
+// Modals
+import { ReopenTaskModal } from '@/components/supervisor/ReopenTaskModal';
+import { EscalateIssueModal } from '@/components/supervisor/EscalateIssueModal';
+import { CreateTaskModal } from '@/components/dispatcher/CreateTaskModal';
+
+export type DispatcherSupervisorTab =
+  | 'overview'
+  | 'queue'
+  | 'workload'
+  | 'blockers'
+  | 'rooms'
+  | 'medical_therapy'
+  | 'menu_orders'
+  | 'routing'
+  | 'sla'
+  | 'policies'
+  | 'reports'
+  | 'audit'
+  | 'notifications';
+
+interface NavItem {
+  id: DispatcherSupervisorTab;
+  label: string;
+  shortLabel: string;
+  icon: typeof LayoutDashboard;
+  badge?: number | string;
+  badgeTone?: 'neutral' | 'danger' | 'warning' | 'success';
+}
+
+export function DispatcherSupervisorConsole() {
+  const {
+    state,
+    setActiveDispatcherDept,
+    approveInspection,
+    reopenInspection,
+    reviewFulfillerReassignment,
+    escalateSupervisorIssue,
+    submitShiftHandover,
+    acknowledgeShiftHandover,
+    updateStaffAvailability,
+    updateStaffCapacity,
+    markNotificationRead,
+    clearAllNotifications,
+  } = useDemo();
+
+  const [activeTab, setActiveTab] = useState<DispatcherSupervisorTab>('overview');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Modals state
+  const [reopenTargetInspection, setReopenTargetInspection] = useState<SupervisorInspection | null>(null);
+  const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
+  const [isEscalateModalOpen, setIsEscalateModalOpen] = useState(false);
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+
+  // Department state & URL query synchronization
+  const currentDept: DispatcherDepartment = state.activeDispatcherDept || 'Housekeeping';
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const deptParam = params.get('dept')?.toLowerCase();
+      if (deptParam === 'wellness' || deptParam === 'spa') {
+        setActiveDispatcherDept('Wellness');
+      } else if (deptParam === 'maintenance' || deptParam === 'engineering') {
+        setActiveDispatcherDept('Maintenance & Engineering');
+      } else if (deptParam === 'fnb' || deptParam === 'food' || deptParam === 'beverage') {
+        setActiveDispatcherDept('Food & Beverages');
+      } else if (deptParam === 'housekeeping' || deptParam === 'hk') {
+        setActiveDispatcherDept('Housekeeping');
+      }
+    }
+  }, [setActiveDispatcherDept]);
+
+  // Redirect away from department-specific tabs if switched to other departments
+  useEffect(() => {
+    if ((currentDept === 'Wellness' || currentDept === 'Food & Beverages') && activeTab === 'rooms') {
+      setActiveTab('overview');
+    }
+    if (currentDept !== 'Food & Beverages' && activeTab === 'menu_orders') {
+      setActiveTab('overview');
+    }
+    if (currentDept !== 'Wellness' && activeTab === 'medical_therapy') {
+      setActiveTab('overview');
+    }
+  }, [currentDept, activeTab]);
+
+  // Department-specific task filter
+  const isTaskInActiveDept = (t: WorkItem) => {
+    const deptStr = (t.department || '').toLowerCase();
+    const catStr = (t.category || '').toLowerCase();
+    if (currentDept === 'Housekeeping') {
+      return (
+        deptStr.includes('housekeeping') ||
+        ['housekeeping', 'lost_found', 'turnover', 'linen'].includes(catStr)
+      );
+    }
+    if (currentDept === 'Wellness') {
+      return (
+        deptStr.includes('spa') ||
+        deptStr.includes('wellness') ||
+        ['spa', 'wellness', 'massage', 'hydrotherapy', 'medical', 'therapy'].includes(catStr)
+      );
+    }
+    if (currentDept === 'Maintenance & Engineering') {
+      return (
+        deptStr.includes('maintenance') ||
+        deptStr.includes('engineering') ||
+        ['maintenance', 'hvac', 'plumbing', 'electrical', 'repair'].includes(catStr)
+      );
+    }
+    if (currentDept === 'Food & Beverages') {
+      return (
+        deptStr.includes('food') ||
+        deptStr.includes('beverage') ||
+        deptStr.includes('f&b') ||
+        ['room_service', 'dining', 'fnb', 'kitchen', 'restaurant', 'bar'].includes(catStr)
+      );
+    }
+    return true;
+  };
+
+  // Department-specific staff filter
+  const isStaffInActiveDept = (s: StaffAccount) => {
+    const d = s.department.toLowerCase();
+    if (currentDept === 'Housekeeping') return d.includes('house');
+    if (currentDept === 'Wellness') return d.includes('spa') || d.includes('wellness');
+    if (currentDept === 'Maintenance & Engineering') return d.includes('maint') || d.includes('eng');
+    if (currentDept === 'Food & Beverages') return d.includes('food') || d.includes('bev');
+    return true;
+  };
+
+  // Unified department items
+  const allTasks = useMemo(
+    () =>
+      [
+        ...(state.items.department_dispatcher_supervisor ?? []),
+        ...(state.items.department_dispatcher ?? []),
+      ]
+        .filter((t, i, arr) => arr.findIndex((x) => x.id === t.id) === i)
+        .filter(isTaskInActiveDept),
+    [state.items.department_dispatcher_supervisor, state.items.department_dispatcher, currentDept],
+  );
+
+  const staffList = useMemo(
+    () => (state.staffAccounts ?? []).filter(isStaffInActiveDept),
+    [state.staffAccounts, currentDept],
+  );
+
+  const incidents = useMemo(
+    () =>
+      (state.incidents ?? []).filter((inc) => {
+        const d = (inc.department || inc.title || '').toLowerCase();
+        if (currentDept === 'Housekeeping') return d.includes('house');
+        if (currentDept === 'Wellness') return d.includes('spa') || d.includes('wellness');
+        if (currentDept === 'Maintenance & Engineering') return d.includes('maint') || d.includes('eng') || d.includes('safety');
+        if (currentDept === 'Food & Beverages') return d.includes('food') || d.includes('bev') || d.includes('dining');
+        return true;
+      }),
+    [state.incidents, currentDept],
+  );
+
+  const departmentRooms = useMemo(() => {
+    return state.frontDesk?.rooms ?? [];
+  }, [state.frontDesk?.rooms]);
+
+  const unassignedCount = allTasks.filter((t) => t.status === 'Unassigned' || t.status === 'Received').length;
+  const overdueCount = allTasks.filter(
+    (t) =>
+      t.ackStatus === 'overdue' ||
+      t.chip?.toLowerCase().includes('overdue') ||
+      t.slaDue?.toLowerCase().includes('overdue'),
+  ).length;
+
+  const blockedCount = allTasks.filter(
+    (t) => t.status === 'Blocked' || (t.history && t.history[t.history.length - 1]?.status === 'Blocked'),
+  ).length;
+  const reassignPendingCount = allTasks.filter(
+    (t) => t.reassignPending || t.status === 'Reassignment requested',
+  ).length;
+
+  const medicalTherapyCount = useMemo(() => {
+    if (currentDept !== 'Wellness') return 0;
+    return allTasks.filter((t) => {
+      const cat = (t.category || '').toLowerCase();
+      const ref = (t.ref || '').toLowerCase();
+      const title = (t.title || '').toLowerCase();
+      const isMedOrTher =
+        cat === 'medical' ||
+        cat === 'therapy' ||
+        ref.startsWith('med-') ||
+        ref.startsWith('ther-') ||
+        title.includes('asthma') ||
+        title.includes('allergic') ||
+        title.includes('therapy') ||
+        title.includes('physiotherapy');
+      return isMedOrTher && (t.status === 'Unassigned' || t.status === 'Received');
+    }).length;
+  }, [allTasks, currentDept]);
+
+  const fnbActiveOrdersCount = useMemo(() => {
+    if (currentDept !== 'Food & Beverages') return 0;
+    return allTasks.filter((t) => {
+      const isFnb =
+        t.category === 'room_service' ||
+        t.department === 'Food & Beverage' ||
+        t.department === 'Food & Beverages' ||
+        (t.orderLines && t.orderLines.length > 0) ||
+        t.ref?.startsWith('DIN') ||
+        t.ref?.startsWith('RS') ||
+        t.ref?.startsWith('FB');
+      return (
+        isFnb &&
+        t.status !== 'Delivered' &&
+        t.status !== 'Completed' &&
+        t.status !== 'verified' &&
+        t.status !== 'Cancelled'
+      );
+    }).length;
+  }, [allTasks, currentDept]);
+
+  const pendingDutyRequestsCount = useMemo(() => {
+    const dutyCount = (state.dutyStatusRequests ?? []).filter((r) => {
+      const isPending = r.status === 'pending';
+      const d1 = (r.department || '').toLowerCase();
+      const d2 = currentDept.toLowerCase();
+      const inDept =
+        d1 === d2 ||
+        (d2.includes('house') && d1.includes('house')) ||
+        ((d2.includes('maint') || d2.includes('eng')) && (d1.includes('maint') || d1.includes('eng'))) ||
+        ((d2.includes('spa') || d2.includes('wellness')) && (d1.includes('spa') || d1.includes('wellness'))) ||
+        ((d2.includes('food') || d2.includes('bev')) && (d1.includes('food') || d1.includes('bev')));
+      return isPending && inDept;
+    }).length;
+
+    const reassignCount = (state.taskReassignRequests ?? []).filter((r) => {
+      const isPending = r.status === 'pending';
+      const d1 = (r.department || '').toLowerCase();
+      const d2 = currentDept.toLowerCase();
+      const inDept =
+        d1 === d2 ||
+        (d2.includes('house') && d1.includes('house')) ||
+        ((d2.includes('maint') || d2.includes('eng')) && (d1.includes('maint') || d1.includes('eng'))) ||
+        ((d2.includes('spa') || d2.includes('wellness')) && (d1.includes('spa') || d1.includes('wellness'))) ||
+        ((d2.includes('food') || d2.includes('bev')) && (d1.includes('food') || d1.includes('bev')));
+      return isPending && inDept;
+    }).length;
+
+    return dutyCount + reassignCount;
+  }, [state.dutyStatusRequests, state.taskReassignRequests, currentDept]);
+
+  const navItems: NavItem[] = [
+    {
+      id: 'overview',
+      label: 'Console Overview',
+      shortLabel: 'Overview',
+      icon: LayoutDashboard,
+    },
+    {
+      id: 'queue',
+      label: 'Task',
+      shortLabel: 'Task',
+      icon: Layers,
+      badge: unassignedCount > 0 ? unassignedCount : undefined,
+      badgeTone: 'warning',
+    },
+    {
+      id: 'workload',
+      label: 'Team',
+      shortLabel: 'Team',
+      icon: Users,
+      badge: pendingDutyRequestsCount > 0 ? pendingDutyRequestsCount : undefined,
+      badgeTone: 'warning' as const,
+    },
+    {
+      id: 'blockers',
+      label: 'Escalations',
+      shortLabel: 'Escalations',
+      icon: Flame,
+      badge: blockedCount + reassignPendingCount > 0 ? blockedCount + reassignPendingCount : undefined,
+      badgeTone: 'danger',
+    },
+    ...(currentDept !== 'Wellness' && currentDept !== 'Food & Beverages'
+      ? [
+          {
+            id: 'rooms' as DispatcherSupervisorTab,
+            label: 'Room Turnover & Readiness',
+            shortLabel: 'Rooms',
+            icon: BedDouble,
+          },
+        ]
+      : []),
+    ...(currentDept === 'Wellness'
+      ? [
+          {
+            id: 'medical_therapy' as DispatcherSupervisorTab,
+            label: 'Medical & Therapy',
+            shortLabel: 'Medical & Therapy',
+            icon: HeartPulse,
+            badge: medicalTherapyCount > 0 ? `${medicalTherapyCount} Action` : undefined,
+            badgeTone: 'danger' as const,
+          },
+        ]
+      : []),
+    ...(currentDept === 'Food & Beverages'
+      ? [
+          {
+            id: 'menu_orders' as DispatcherSupervisorTab,
+            label: 'Menu & Orders',
+            shortLabel: 'Menu & Orders',
+            icon: UtensilsCrossed,
+            badge: fnbActiveOrdersCount > 0 ? fnbActiveOrdersCount : undefined,
+            badgeTone: 'warning' as const,
+          },
+        ]
+      : []),
+    {
+      id: 'sla',
+      label: 'SLA Monitor',
+      shortLabel: 'SLA Monitor',
+      icon: Clock,
+      badge: overdueCount > 0 ? `${overdueCount} Breach` : undefined,
+      badgeTone: 'danger',
+    },
+    {
+      id: 'policies',
+      label: 'Policies & Authority',
+      shortLabel: 'Policies',
+      icon: ShieldCheck,
+    },
+    {
+      id: 'reports',
+      label: 'Operational Analytics',
+      shortLabel: 'Analytics',
+      icon: BarChart3,
+    },
+
+
+  ];
+
+  return (
+    <div className="w-full pb-16">
+      {/* Main Layout: Sticky Sidebar + Dynamic View */}
+      <div className="flex flex-col lg:flex-row items-start gap-6">
+        {/* Sidebar */}
+        <aside
+          className={`shrink-0 transition-all duration-300 ease-in-out lg:sticky lg:top-20 z-20 self-start ${
+            sidebarCollapsed ? 'w-full lg:w-20' : 'w-full lg:w-72'
+          }`}
+        >
+          <div className="rounded-3xl border border-white/10 bg-ink-900/90 p-3 backdrop-blur-xl shadow-2xl space-y-2 max-h-[calc(100vh-6rem)] overflow-y-auto no-scrollbar">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+              {!sidebarCollapsed && (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-mist-400">
+                  Navigation
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="hidden lg:flex items-center justify-center p-1 rounded-xl text-mist-400 hover:text-white hover:bg-white/[0.06] transition"
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {sidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+
+            <nav className="space-y-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition ${isActive
+                      ? 'bg-amber-400 text-ink-950 shadow-lg shadow-amber-400/20 font-bold'
+                      : 'text-mist-300 hover:text-white hover:bg-white/[0.04]'
+                      } ${sidebarCollapsed ? 'justify-center px-0' : 'justify-between'}`}
+                    title={sidebarCollapsed ? item.label : undefined}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                    </div>
+
+                    {!sidebarCollapsed && item.badge !== undefined && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${item.badgeTone === 'danger'
+                          ? isActive
+                            ? 'bg-ink-950 text-rose-300'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          : item.badgeTone === 'warning'
+                            ? isActive
+                              ? 'bg-ink-950 text-amber-300'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : isActive
+                              ? 'bg-ink-950 text-emerald-300'
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Dynamic Tab Content Area */}
+        <div className="flex-1 min-w-0 w-full space-y-6">
+          {activeTab === 'overview' && (
+            <DispatcherSupervisorOverviewTab
+              activeDept={currentDept}
+              rooms={departmentRooms}
+              staffList={staffList}
+              tasks={allTasks}
+              incidents={incidents}
+              onNavigateTab={(tab) => setActiveTab(tab as DispatcherSupervisorTab)}
+              onOpenEscalate={() => setIsEscalateModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'queue' && <DispatcherQueueTab tasks={allTasks} activeDept={currentDept} />}
+
+          {activeTab === 'rooms' && (
+            <SupervisorRoomsTab
+              rooms={departmentRooms}
+              department={currentDept}
+              onOpenEscalateForRoom={() => {
+                setIsEscalateModalOpen(true);
+              }}
+            />
+          )}
+
+          {activeTab === 'medical_therapy' && (
+            <SupervisorMedicalTherapyTab
+              tasks={allTasks}
+              staffList={staffList}
+              department={currentDept}
+            />
+          )}
+
+          {activeTab === 'menu_orders' && <DispatcherMenuOrdersTab />}
+
+          {activeTab === 'workload' && <DispatcherWorkloadTab staffList={staffList} department={currentDept} />}
+
+          {activeTab === 'blockers' && (
+            <DispatcherEscalationsTab
+              department={currentDept}
+              tasks={allTasks}
+              onOpenEscalateModal={() => setIsEscalateModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'routing' && <DispatcherRoutingTab />}
+
+          {activeTab === 'sla' && <DispatcherSlaTab tasks={allTasks} department={currentDept} />}
+
+          {activeTab === 'policies' && <DispatcherPoliciesTab department={currentDept} />}
+
+          {activeTab === 'reports' && <DispatcherReportsTab department={currentDept} tasks={allTasks} />}
+
+          {activeTab === 'audit' && <SupervisorAuditTab auditTrail={state.auditTrail ?? []} />}
+
+          {activeTab === 'notifications' && (
+            <SupervisorNotificationsTab
+              notifications={state.notifications ?? []}
+              onMarkRead={markNotificationRead}
+              onClearAll={clearAllNotifications}
+              onNavigateTab={(tab) => setActiveTab(tab as DispatcherSupervisorTab)}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Reusable Modals */}
+      <ReopenTaskModal
+        isOpen={isReopenModalOpen}
+        onClose={() => {
+          setIsReopenModalOpen(false);
+          setReopenTargetInspection(null);
+        }}
+        inspection={reopenTargetInspection}
+        staffList={staffList}
+        onSubmit={reopenInspection}
+        onReopen={reopenInspection}
+      />
+
+      <EscalateIssueModal
+        isOpen={isEscalateModalOpen}
+        onClose={() => setIsEscalateModalOpen(false)}
+        onSubmit={escalateSupervisorIssue}
+        onEscalate={escalateSupervisorIssue}
+      />
+
+      <CreateTaskModal
+        isOpen={isCreateTaskModalOpen}
+        onClose={() => setIsCreateTaskModalOpen(false)}
+      />
+    </div>
+  );
+}

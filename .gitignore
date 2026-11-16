@@ -1,0 +1,47 @@
+# ==============================================================================
+# Monorepo Root Git Ignore
+# ==============================================================================
+
+# Next.js Frontend Build Artifacts and Dependencies
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.js
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/coverage/
+frontend/.vercel/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts.bak
+
+# Frontend Environment and Secret Files
+frontend/.env*.local
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/.env
+
+# Java Spring Boot Backend Build Artifacts
+backend/target/
+backend/*.jar
+backend/*.war
+backend/*.log
+backend/.flattened-pom.xml
+
+# IDEs and Code Editors
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.pem
+*.key
