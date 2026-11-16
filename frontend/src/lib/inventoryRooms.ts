@@ -469,12 +469,14 @@ function generateRoomPin(roomNo: string): string {
  */
 export function getComputedRoomsAndFloors(
   state: DemoState,
-  roomOverrides?: Record<string, Partial<RoomTileData>>
+  roomOverrides?: Record<string, Partial<RoomTileData>>,
+  hotelSlug?: string
 ): {
   allRooms: RoomTileData[];
   floors: number[];
   floorInfo: Record<number, { name: string; wing: string }>;
 } {
+  const isDefaultDemoHotel = !hotelSlug || hotelSlug === 'grand-adp';
   const stateRooms: RoomRecord[] = state.frontDesk?.rooms ?? [];
   const stays: StayRecord[] = state.frontDesk?.stays ?? [];
 
@@ -482,25 +484,34 @@ export function getComputedRoomsAndFloors(
   const removedFloors = new Set(state.removedFloors ?? []);
 
   // 1. Merge Floor Information
-  const floorInfo: Record<number, { name: string; wing: string }> = { ...DEFAULT_FLOOR_INFO };
+  // Default template floors only apply to default grand-adp demo hotel
+  const floorInfo: Record<number, { name: string; wing: string }> = isDefaultDemoHotel
+    ? { ...DEFAULT_FLOOR_INFO }
+    : {};
+
   (state.customFloors ?? []).forEach((cf) => {
-    floorInfo[cf.floor] = {
-      name: cf.name || `FLOOR ${cf.floor}`,
-      wing: cf.wing || `Floor ${cf.floor} Wing`,
-    };
-  });
-
-  // 2. Build Base Specs combining default template and custom rooms
-  const combinedSpecs: RoomInventorySeed[] = [];
-
-  // Default rooms not removed
-  BASE_ROOM_INVENTORY_27.forEach((base) => {
-    if (!removedRoomNos.has(base.no) && !removedFloors.has(base.floor)) {
-      combinedSpecs.push(base);
+    if (!removedFloors.has(cf.floor)) {
+      floorInfo[cf.floor] = {
+        name: cf.name || `FLOOR ${cf.floor}`,
+        wing: cf.wing || `Floor ${cf.floor} Wing`,
+      };
     }
   });
 
-  // Custom added rooms
+  // 2. Build Base Specs
+  // For grand-adp default demo hotel, use baseline 27 rooms if not removed.
+  // For newly created or other hotels, start with a completely empty list!
+  const combinedSpecs: RoomInventorySeed[] = [];
+
+  if (isDefaultDemoHotel) {
+    BASE_ROOM_INVENTORY_27.forEach((base) => {
+      if (!removedRoomNos.has(base.no) && !removedFloors.has(base.floor)) {
+        combinedSpecs.push(base);
+      }
+    });
+  }
+
+  // Custom added rooms from user / backend DB
   (state.customRooms ?? []).forEach((cr) => {
     if (!removedRoomNos.has(cr.no) && !removedFloors.has(cr.floor)) {
       // Prevent duplicates if already in list

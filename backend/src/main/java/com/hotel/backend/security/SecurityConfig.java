@@ -61,13 +61,8 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/hotels/public-list").permitAll()
-                .requestMatchers("/api/hotels/*/public").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/hotels/qr").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/hotels/qr/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/hotels/*/qr").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/hotels/*/qr/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/hotels/*/qr/url").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/hotels/*/qr/download").permitAll()
+                .requestMatchers("/api/hotels/*/rooms/**").permitAll()
+                .requestMatchers("/api/hotels/*/floors/**").permitAll()
                 .requestMatchers("/api/health").permitAll()
                 // Admin endpoints strictly protected by role ADMIN
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

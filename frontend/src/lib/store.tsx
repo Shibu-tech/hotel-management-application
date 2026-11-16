@@ -14,6 +14,13 @@ import {
   type ReactNode,
 } from 'react';
 import { CircleCheck } from 'lucide-react';
+import {
+  fetchHotelInventory,
+  addHotelRoom,
+  deleteHotelRoom,
+  addHotelFloor,
+  deleteHotelFloor,
+} from '@/lib/hotelRoomsApi';
 import { INITIAL_DINING_CATEGORIES, INITIAL_DINING_MENU } from '@/components/guest/diningData';
 import { seedEventsConfig } from '@/components/guest/eventsData';
 import type { EventsCelebrationsConfig } from '@/types/demo';
@@ -60,6 +67,7 @@ import { roleById } from '@/lib/roles';
 import type {
   AuditEvent,
   DemoState,
+  Readiness,
   GuestHistoryEntry,
   InAppNotification,
   IncidentRecord,
@@ -289,8 +297,12 @@ export function seedFreshTenantState(slug: string, name?: string): DemoState {
     taskReassignRequests: [],
     resourceRequests: [],
     shiftHandovers: [],
+    customRooms: [],
+    customFloors: [],
+    removedRoomNos: [],
+    removedFloors: [],
     frontDesk: {
-      rooms: base.frontDesk?.rooms || [],
+      rooms: [],
       stays: [],
       sync: [],
       complaints: [],
@@ -889,6 +901,61 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       /* storage full or blocked: demo still works in memory */
     }
   }, [state, hydrated, currentHotelSlug]);
+
+  // Synchronize rooms and floors from Neon PostgreSQL backend for current hotel tenant
+  useEffect(() => {
+    if (!hydrated || !currentHotelSlug) return;
+    fetchHotelInventory(currentHotelSlug).then((inv) => {
+      if (!inv) return;
+      setState((prev) => {
+        const backendRooms: CustomRoomSpec[] = (inv.allRooms || []).map((r) => ({
+          no: r.no,
+          floor: r.floor,
+          typeTag: r.typeTag,
+          typeFull: r.typeFull,
+          readiness: r.readiness as Readiness,
+          occupied: r.occupied,
+          dnd: r.dnd,
+          badgeStatus: r.badgeStatus,
+          guestName: r.guestName,
+          guestPhone: r.guestPhone,
+          guestEmail: r.guestEmail,
+          bookingRef: r.bookingRef,
+          checkInDate: r.checkInDate,
+          checkOutDate: r.checkOutDate,
+          duration: r.duration,
+          guestsCount: r.guestsCount,
+          vipTier: r.vipTier,
+          folioBalance: r.folioBalance,
+          preferences: r.preferences,
+          cleanerAssigned: r.cleanerAssigned,
+          cleaningCategory: r.cleaningCategory,
+          vip: r.vip,
+          pin: r.pin,
+        }));
+
+        const backendFloors: CustomFloorInfo[] = Object.values(inv.floorInfo || {}).map((f) => ({
+          floor: f.floor,
+          name: f.name,
+          wing: f.wing,
+        }));
+
+        if (currentHotelSlug !== 'grand-adp') {
+          return {
+            ...prev,
+            customRooms: backendRooms,
+            customFloors: backendFloors,
+          };
+        }
+
+        return {
+          ...prev,
+          customRooms: backendRooms.length > 0 ? backendRooms : prev.customRooms,
+          customFloors: backendFloors.length > 0 ? backendFloors : prev.customFloors,
+        };
+      });
+    });
+  }, [hydrated, currentHotelSlug, setState]);
 
   // Keep the whole site on one theme: mirror it onto <html data-theme> and class.
   useEffect(() => {
@@ -6239,6 +6306,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const addFloor = useCallback((floor: number, name?: string, wing?: string) => {
     const floorName = name || `FLOOR ${floor}`;
     const wingName = wing || `Floor ${floor} Wing`;
+    addHotelFloor(currentHotelSlug, { floor, name: floorName, wing: wingName });
     setState((prev) => {
       const existingFloors = prev.customFloors ?? [];
       const updatedFloors = existingFloors.some((f) => f.floor === floor)
@@ -6253,9 +6321,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       };
     });
     notify(`Floor ${floor} added to inventory`);
-  }, [notify, setState]);
+  }, [notify, setState, currentHotelSlug]);
 
   const removeFloor = useCallback((floor: number) => {
+    deleteHotelFloor(currentHotelSlug, floor);
     setState((prev) => {
       const updatedRemoved = Array.from(new Set([...(prev.removedFloors ?? []), floor]));
       const updatedCustom = (prev.customFloors ?? []).filter((f) => f.floor !== floor);
@@ -6266,9 +6335,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       };
     });
     notify(`Floor ${floor} removed from inventory`);
-  }, [notify, setState]);
+  }, [notify, setState, currentHotelSlug]);
 
   const addRoom = useCallback((room: CustomRoomSpec) => {
+    addHotelRoom(currentHotelSlug, {
+      roomNumber: room.no,
+      floor: room.floor,
+      typeTag: room.typeTag,
+      typeFull: room.typeFull,
+      readiness: room.readiness,
+      occupied: room.occupied,
+      guestName: room.guestName,
+      guestPhone: room.guestPhone,
+      guestEmail: room.guestEmail,
+      pin: room.pin,
+    });
     setState((prev) => {
       const existingCustom = prev.customRooms ?? [];
       const updatedCustom = existingCustom.some((r) => r.no === room.no)
@@ -6311,9 +6392,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       };
     });
     notify(`Room ${room.no} (${room.typeFull}) added on Floor ${room.floor}`);
-  }, [notify, setState]);
+  }, [notify, setState, currentHotelSlug]);
 
   const removeRoom = useCallback((roomNo: string) => {
+    deleteHotelRoom(currentHotelSlug, roomNo);
     setState((prev) => {
       const updatedRemoved = Array.from(new Set([...(prev.removedRoomNos ?? []), roomNo]));
       const updatedCustom = (prev.customRooms ?? []).filter((r) => r.no !== roomNo);
@@ -6329,7 +6411,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       };
     });
     notify(`Room ${roomNo} removed from inventory`);
-  }, [notify, setState]);
+  }, [notify, setState, currentHotelSlug]);
 
 
   const updateDndStatus = useCallback<DemoApi['updateDndStatus']>(
