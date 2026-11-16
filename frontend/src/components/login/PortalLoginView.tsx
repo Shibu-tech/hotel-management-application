@@ -203,7 +203,6 @@ export function PortalLoginView() {
   const { t } = useI18n();
 
   // Multi-Hotel Tenant Selector State
-  const [isMultiHotel, setIsMultiHotel] = useState(false);
   const [availableHotels, setAvailableHotels] = useState<HotelOption[]>(DEFAULT_PUBLIC_HOTELS);
   const [selectedHotelSlug, setSelectedHotelSlug] = useState('grand-adp');
   const [isLoadingHotels, setIsLoadingHotels] = useState(false);
@@ -256,32 +255,50 @@ export function PortalLoginView() {
     return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
   };
 
-  // Fetch active hotels for Multi-Hotel mode
+  // Fetch active hotels dynamically (Neon DB + Local Fallback)
   const fetchPublicHotels = useCallback(async () => {
     setIsLoadingHotels(true);
+    let loadedHotels: HotelOption[] | null = null;
+
     try {
       const res = await fetch(`${getApiUrl()}/hotels/public-list`);
       if (res.ok) {
         const data: HotelOption[] = await res.json();
         if (data && data.length > 0) {
-          setAvailableHotels(data);
-          if (!data.some((h) => h.slug === selectedHotelSlug)) {
-            setSelectedHotelSlug(data[0].slug);
-          }
+          loadedHotels = data;
         }
       }
     } catch {
-      // Backend offline: keep DEFAULT_PUBLIC_HOTELS
-    } finally {
-      setIsLoadingHotels(false);
+      // Backend offline
     }
+
+    if (!loadedHotels && typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('admin_cached_hotels');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            loadedHotels = parsed.map((h: { id: number; name: string; slug: string }) => ({
+              id: h.id,
+              name: h.name,
+              slug: h.slug,
+            }));
+          }
+        }
+      } catch {}
+    }
+
+    const finalHotels = loadedHotels && loadedHotels.length > 0 ? loadedHotels : DEFAULT_PUBLIC_HOTELS;
+    setAvailableHotels(finalHotels);
+    if (!finalHotels.some((h) => h.slug === selectedHotelSlug)) {
+      setSelectedHotelSlug(finalHotels[0].slug);
+    }
+    setIsLoadingHotels(false);
   }, [selectedHotelSlug]);
 
   useEffect(() => {
-    if (isMultiHotel) {
-      fetchPublicHotels();
-    }
-  }, [isMultiHotel, fetchPublicHotels]);
+    fetchPublicHotels();
+  }, [fetchPublicHotels]);
 
   // Requirement: Clicking any role card ONLY pre-fills email and password
   const handleSelectRole = (role: PresetRole) => {
@@ -379,7 +396,7 @@ export function PortalLoginView() {
     const payload = {
       email: cleanEmail,
       password: cleanPassword,
-      hotelSlug: isMultiHotel ? selectedHotelSlug : undefined,
+      hotelSlug: selectedHotelSlug || 'grand-adp',
     };
 
     try {
@@ -436,7 +453,7 @@ export function PortalLoginView() {
   // Graceful offline fallback if backend server is not running during local inspection
   const handleOfflineFallback = (cleanEmail: string) => {
     let fallbackRedirect = '/login';
-    const effectiveSlug = isMultiHotel ? selectedHotelSlug : 'grand-adp';
+    const effectiveSlug = selectedHotelSlug || 'grand-adp';
 
     if (cleanEmail.includes('admin') || selectedRoleId === 'admin') {
       fallbackRedirect = '/admin/dashboard';
@@ -595,37 +612,44 @@ export function PortalLoginView() {
             </p>
           </div>
 
-          {/* Requirement 3: Hotel Selector Toggle Switch */}
-          <div
-            className={`flex items-center gap-3 px-4 py-2 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${
-              isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
-            }`}
-          >
-            <div className="text-right">
-              <span className="text-xs font-semibold block">
-                {isMultiHotel ? 'Multi-Hotel Mode' : 'Single Hotel Mode'}
-              </span>
-              <span className="text-[10px] text-slate-400 block -mt-0.5">
-                {isMultiHotel ? 'Select property tenant' : 'Default (The Grand ADP)'}
-              </span>
+          {/* Dynamic Hotel Property Tenant Chooser Toggle */}
+          <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider uppercase text-amber-500">
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Select Hotel Tenant</span>
             </div>
 
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isMultiHotel}
-              onClick={() => setIsMultiHotel(!isMultiHotel)}
-              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                isMultiHotel ? 'bg-amber-500' : isLight ? 'bg-slate-300' : 'bg-slate-700'
+            <div
+              className={`flex flex-wrap items-center gap-1.5 p-1 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${
+                isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
               }`}
-              title="Toggle Multi-Hotel Tenant Mode"
             >
-              <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                  isMultiHotel ? 'translate-x-6' : 'translate-x-0'
-                }`}
-              />
-            </button>
+              {availableHotels.map((hotel) => {
+                const isSelected = selectedHotelSlug === hotel.slug;
+                return (
+                  <button
+                    key={hotel.slug}
+                    type="button"
+                    onClick={() => {
+                      setSelectedHotelSlug(hotel.slug);
+                      showToast(`Switched hotel scope to ${hotel.name}`);
+                    }}
+                    aria-pressed={isSelected}
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-xs'
+                        : isLight
+                        ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <Building2 className={`w-3.5 h-3.5 ${isSelected ? 'text-slate-950' : 'text-amber-500/70'}`} />
+                    <span>{hotel.name}</span>
+                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -677,48 +701,6 @@ export function PortalLoginView() {
 
               {/* Form */}
               <form id="loginForm" onSubmit={handleLoginSubmit} className="space-y-4 sm:space-y-5">
-                {/* Multi-Hotel Dropdown when Toggle is ON */}
-                {isMultiHotel && (
-                  <div className="animate-in fade-in duration-200">
-                    <label
-                      htmlFor="hotelSelect"
-                      className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${
-                        isLight ? 'text-slate-500' : 'text-slate-400'
-                      }`}
-                    >
-                      Hotel Property Tenant *
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Building2 className="w-5 h-5 text-amber-500" />
-                      </span>
-                      <select
-                        id="hotelSelect"
-                        value={selectedHotelSlug}
-                        onChange={(e) => setSelectedHotelSlug(e.target.value)}
-                        className={`w-full pl-11 pr-8 py-3 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all appearance-none cursor-pointer ${
-                          isLight
-                            ? 'bg-slate-50 text-slate-900 border border-slate-200'
-                            : 'bg-[#070d18] text-white border border-white/10'
-                        }`}
-                      >
-                        {isLoadingHotels ? (
-                          <option disabled>Loading registered hotels...</option>
-                        ) : (
-                          availableHotels.map((hotel) => (
-                            <option key={hotel.slug} value={hotel.slug}>
-                              {hotel.name} ({hotel.slug})
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                        <ChevronDown className="w-4 h-4" />
-                      </span>
-                    </div>
-                  </div>
-                )}
-
                 {/* Email Field */}
                 <div>
                   <label

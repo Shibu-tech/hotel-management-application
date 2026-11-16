@@ -341,21 +341,7 @@ export function RequestsPanel({
   const all = state.items.front_desk_coordinator ?? [];
   const term = query.trim().toLowerCase();
 
-  const filteredBySource = all.filter((i) => matchesRequestTab(i, sourceTab));
-
-  const tabCounts = useMemo(() => {
-    const res: Record<RequestSourceTab, number> = {
-      guest_requests: 0,
-      complaints: 0,
-      event_requests: 0,
-      fulfiller_escalations: 0,
-      route: 0,
-    };
-    for (const t of REQUEST_SOURCE_TABS) {
-      res[t.id] = all.filter((i) => matchesRequestTab(i, t.id)).filter(needsAction).length;
-    }
-    return res;
-  }, [all]);
+  const filteredBySource = all;
 
   const counts: Record<View, number> = {
     action: filteredBySource.filter(needsAction).length,
@@ -534,37 +520,9 @@ export function RequestsPanel({
 
   return (
     <div className="space-y-4">
-      {/* Top Controls Row: 5 Sub-tabs on left, [+ New Case] & [Search] horizontally aligned on right */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        {/* 5 Sub-Tabs */}
-        <div role="tablist" aria-label="Request categories" className="flex flex-wrap gap-1.5">
-          {REQUEST_SOURCE_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={sourceTab === t.id}
-              onClick={() => setSourceTab(t.id)}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-semibold transition inline-flex items-center gap-1.5',
-                sourceTab === t.id ? 'chip-accent' : 'border-white/10 text-mist-300 hover:bg-white/5'
-              )}
-            >
-              <span>{t.label}</span>
-              <span
-                className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
-                  sourceTab === t.id ? 'bg-amber-400 text-ink-950' : 'bg-white/10 text-mist-300'
-                )}
-              >
-                {tabCounts[t.id] ?? 0}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* [+ New Case] button placed directly to the LEFT of the search bar on the same row */}
-        <div className="flex items-center gap-2 w-full lg:w-auto">
+      {/* Top Controls Row: [+ New Case] & [Search] horizontally aligned */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             size="sm"
             variant="accent"
@@ -574,7 +532,7 @@ export function RequestsPanel({
           >
             + New Case
           </Button>
-          <div className="relative w-full sm:w-56">
+          <div className="relative w-full sm:w-64">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist-400" aria-hidden />
             <label htmlFor="req-search" className="sr-only">
               Search requests
@@ -583,7 +541,7 @@ export function RequestsPanel({
               id="req-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Room, guest, ref or query"
+              placeholder="Search guest, room, case #..."
               autoComplete="off"
               className="field w-full pl-9"
             />
