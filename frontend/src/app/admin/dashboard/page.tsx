@@ -26,8 +26,13 @@ import {
   ClipboardCheck,
   Smartphone,
   ChevronDown,
+  QrCode,
+  Download,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useDemo } from '@/lib/store';
+import { HotelQrImage } from '@/components/shared/HotelQrImage';
 
 interface HotelRecord {
   id: number;
@@ -96,6 +101,55 @@ export default function AdminDashboardPage() {
 
   // Auth User check
   const [adminUser, setAdminUser] = useState<{ email: string; fullName: string; role: string } | null>(null);
+
+  // QR Code States & Handlers
+  const [copiedHotelId, setCopiedHotelId] = useState<number | null>(null);
+  const [qrModalHotel, setQrModalHotel] = useState<HotelRecord | null>(null);
+
+  const getDestinationUrl = (hotelId: number) => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/${hotelId}`;
+    }
+    return `http://localhost:3000/${hotelId}`;
+  };
+
+  const handleCopyUrl = async (hotelId: number) => {
+    const url = getDestinationUrl(hotelId);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedHotelId(hotelId);
+      showToast(`Copied QR destination URL: ${url}`);
+      setTimeout(() => setCopiedHotelId(null), 2500);
+    } catch {
+      showToast(`Failed to copy: ${url}`);
+    }
+  };
+
+  const handleDownloadQr = async (hotel: HotelRecord) => {
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`${getApiUrl()}/hotels/${hotel.id}/qr/download`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to download (HTTP ${res.status})`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `hotel-${hotel.id}-qr.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+      showToast(`Downloaded QR Code: hotel-${hotel.id}-qr.png`);
+    } catch (err: any) {
+      showToast(err.message || 'Download failed');
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -374,17 +428,15 @@ export default function AdminDashboardPage() {
 
   return (
     <div
-      className={`min-h-screen font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 ${
-        isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#070c18] text-slate-100'
-      }`}
+      className={`min-h-screen font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#070c18] text-slate-100'
+        }`}
     >
       {/* Top Admin Header */}
       <header
-        className={`sticky top-0 z-30 px-6 sm:px-10 py-4 flex items-center justify-between border-b backdrop-blur-md ${
-          isLight
+        className={`sticky top-0 z-30 px-6 sm:px-10 py-4 flex items-center justify-between border-b backdrop-blur-md ${isLight
             ? 'border-slate-200 bg-white/80 shadow-xs'
             : 'border-white/10 bg-[#091122]/85 shadow-lg'
-        }`}
+          }`}
       >
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-amber-500/20 ring-1 ring-amber-300/40">
@@ -407,11 +459,10 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => setTheme(isLight ? 'dark' : 'light')}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
-              isLight
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${isLight
                 ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
                 : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-            }`}
+              }`}
             title="Toggle Theme"
           >
             {isLight ? <Sun className="w-4.5 h-4.5 text-amber-500" /> : <Moon className="w-4.5 h-4.5 text-slate-300" />}
@@ -420,11 +471,10 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className={`flex items-center gap-2 text-xs sm:text-[13px] font-medium px-3.5 py-2 rounded-xl transition-all border cursor-pointer ${
-              isLight
+            className={`flex items-center gap-2 text-xs sm:text-[13px] font-medium px-3.5 py-2 rounded-xl transition-all border cursor-pointer ${isLight
                 ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
                 : 'bg-white/5 border-white/10 text-slate-300 hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-800/50'
-            }`}
+              }`}
           >
             <LogOut className="w-4 h-4" />
             <span className="hidden sm:inline">Sign Out</span>
@@ -445,25 +495,34 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-slate-950 bg-gradient-to-r from-[#dfb96c] to-[#c79a40] hover:from-[#e8c57b] hover:to-[#d8a84a] shadow-md shadow-amber-900/20 active:scale-[0.99] transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add New Hotel</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <a
+              href="#hotel-qr-section"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm border border-amber-500/30 text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 transition-all cursor-pointer"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Hotel QR Codes</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-slate-950 bg-gradient-to-r from-[#dfb96c] to-[#c79a40] hover:from-[#e8c57b] hover:to-[#d8a84a] shadow-md shadow-amber-900/20 active:scale-[0.99] transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Hotel</span>
+            </button>
+          </div>
         </div>
 
         {/* Database Status & Global Admin Details Banner */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           {/* Admin User Card */}
           <div
-            className={`p-4 rounded-2xl flex items-center justify-between gap-4 border ${
-              isLight
+            className={`p-4 rounded-2xl flex items-center justify-between gap-4 border ${isLight
                 ? 'bg-amber-50/70 border-amber-200/80 text-amber-950'
                 : 'bg-amber-950/20 border-amber-500/20 text-amber-200'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500">
@@ -486,11 +545,10 @@ export default function AdminDashboardPage() {
 
           {/* Neon Database Status Card */}
           <div
-            className={`p-4 rounded-2xl flex items-center justify-between gap-4 border ${
-              isLight
+            className={`p-4 rounded-2xl flex items-center justify-between gap-4 border ${isLight
                 ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-950'
                 : 'bg-emerald-950/20 border-emerald-500/20 text-emerald-200'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
@@ -511,9 +569,8 @@ export default function AdminDashboardPage() {
               type="button"
               onClick={fetchHotels}
               disabled={isRefreshing}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                isLight ? 'border-emerald-300 bg-white hover:bg-emerald-100' : 'border-emerald-500/30 bg-black/30 hover:bg-black/50'
-              }`}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${isLight ? 'border-emerald-300 bg-white hover:bg-emerald-100' : 'border-emerald-500/30 bg-black/30 hover:bg-black/50'
+                }`}
               title="Sync & Refresh Database"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -530,11 +587,10 @@ export default function AdminDashboardPage() {
               placeholder="Filter by hotel, slug, or GM..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 transition-all ${
-                isLight
+              className={`w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 transition-all ${isLight
                   ? 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
                   : 'bg-[#091122] border-white/10 text-white placeholder-slate-500'
-              }`}
+                }`}
             />
           </div>
 
@@ -545,22 +601,21 @@ export default function AdminDashboardPage() {
 
         {/* Hotels Table */}
         <div
-          className={`rounded-2xl border overflow-visible transition-all shadow-sm ${
-            isLight ? 'bg-white border-slate-200' : 'bg-[#0b1426] border-white/10'
-          }`}
+          className={`rounded-2xl border overflow-visible transition-all shadow-sm ${isLight ? 'bg-white border-slate-200' : 'bg-[#0b1426] border-white/10'
+            }`}
         >
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm border-collapse">
               <thead>
                 <tr
-                  className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
-                    isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-white/[0.02] border-white/5 text-slate-400'
-                  }`}
+                  className={`border-b text-[11px] font-semibold uppercase tracking-wider ${isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-white/[0.02] border-white/5 text-slate-400'
+                    }`}
                 >
                   <th className="py-3.5 px-5">Hotel Property</th>
                   <th className="py-3.5 px-5">Tenant Slug</th>
                   <th className="py-3.5 px-5">General Manager</th>
                   <th className="py-3.5 px-5">GM Email</th>
+                  <th className="py-3.5 px-5">QR Code</th>
                   <th className="py-3.5 px-5">Status</th>
                   <th className="py-3.5 px-5">Data Mode</th>
                   <th className="py-3.5 px-5 text-right">Actions</th>
@@ -569,14 +624,14 @@ export default function AdminDashboardPage() {
               <tbody className="divide-y divide-slate-200/50 dark:divide-white/5">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-amber-500" />
                       Loading active hotel tenants from Neon PostgreSQL...
                     </td>
                   </tr>
                 ) : filteredHotels.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
                       No hotel tenants found matching &quot;{searchTerm}&quot;
                     </td>
                   </tr>
@@ -588,9 +643,8 @@ export default function AdminDashboardPage() {
                     return (
                       <tr
                         key={hotel.id}
-                        className={`transition-colors ${
-                          isLight ? 'hover:bg-slate-50/80' : 'hover:bg-white/[0.02]'
-                        }`}
+                        className={`transition-colors ${isLight ? 'hover:bg-slate-50/80' : 'hover:bg-white/[0.02]'
+                          }`}
                       >
                         <td className="py-4 px-5 font-medium">
                           <div className="flex items-center gap-3">
@@ -626,16 +680,40 @@ export default function AdminDashboardPage() {
                           </div>
                         </td>
 
+                        {/* Inline QR Code Column */}
+                        <td className="py-3 px-5">
+                          <button
+                            type="button"
+                            onClick={() => setQrModalHotel(hotel)}
+                            className="p-1 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all cursor-pointer flex items-center gap-2 group"
+                            title="Click to view full QR code and destination details"
+                          >
+                            <HotelQrImage
+                              hotelId={hotel.id}
+                              destinationUrl={getDestinationUrl(hotel.id)}
+                              size={44}
+                              showBadge={false}
+                            />
+                            <div className="text-left hidden lg:block pr-1">
+                              <span className="text-[11px] font-mono text-amber-500 font-bold block group-hover:underline">
+                                /{hotel.id}
+                              </span>
+                              <span className="text-[9px] text-slate-400 block uppercase tracking-wider">
+                                View QR
+                              </span>
+                            </div>
+                          </button>
+                        </td>
+
                         <td className="py-4 px-5">
                           <button
                             type="button"
                             onClick={() => handleToggleActive(hotel)}
                             title="Click to toggle status"
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all ${
-                              hotel.active
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all ${hotel.active
                                 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25'
                                 : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/25'
-                            }`}
+                              }`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${hotel.active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                             {hotel.active ? 'Active' : 'Suspended'}
@@ -661,11 +739,10 @@ export default function AdminDashboardPage() {
                               <button
                                 type="button"
                                 onClick={() => setActiveDropdownHotelId(isMenuOpen ? null : hotel.id)}
-                                className={`p-1.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                                  isLight
+                                className={`p-1.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition-all cursor-pointer ${isLight
                                     ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
                                     : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-                                }`}
+                                  }`}
                               >
                                 <span>Launch Console</span>
                                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
@@ -673,9 +750,8 @@ export default function AdminDashboardPage() {
 
                               {isMenuOpen && (
                                 <div
-                                  className={`absolute right-0 top-full mt-1.5 w-52 rounded-xl p-1.5 shadow-2xl border z-50 text-left animate-in fade-in zoom-in-95 duration-150 ${
-                                    isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#0d1629] border-white/15 text-slate-100'
-                                  }`}
+                                  className={`absolute right-0 top-full mt-1.5 w-52 rounded-xl p-1.5 shadow-2xl border z-50 text-left animate-in fade-in zoom-in-95 duration-150 ${isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#0d1629] border-white/15 text-slate-100'
+                                    }`}
                                 >
                                   <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 border-b border-white/5 mb-1">
                                     Hotel Role Views
@@ -724,15 +800,28 @@ export default function AdminDashboardPage() {
                               )}
                             </div>
 
+                            {/* View QR Code Button */}
+                            <button
+                              type="button"
+                              onClick={() => setQrModalHotel(hotel)}
+                              className={`p-1.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1 transition-all cursor-pointer ${isLight
+                                  ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                                  : 'bg-amber-950/30 border-amber-500/30 text-amber-300 hover:bg-amber-900/40'
+                                }`}
+                              title="View & Download Hotel QR Code"
+                            >
+                              <QrCode className="w-3.5 h-3.5 text-amber-500" />
+                              <span className="hidden sm:inline">QR Code</span>
+                            </button>
+
                             {/* Delete / Remove Hotel Button */}
                             <button
                               type="button"
                               onClick={() => setHotelToDelete(hotel)}
-                              className={`p-1.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1 transition-all cursor-pointer ${
-                                isLight
+                              className={`p-1.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1 transition-all cursor-pointer ${isLight
                                   ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
                                   : 'bg-rose-950/30 border-rose-800/40 text-rose-400 hover:bg-rose-900/50'
-                              }`}
+                                }`}
                               title="Delete hotel tenant from database"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -748,15 +837,153 @@ export default function AdminDashboardPage() {
             </table>
           </div>
         </div>
+
+        {/* Dynamic Hotel QR Codes Management Section */}
+        <section id="hotel-qr-section" className="mt-12 mb-8 scroll-mt-24">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-500 flex items-center justify-center font-bold">
+                  <QrCode className="w-4.5 h-4.5" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-serif font-bold tracking-tight">
+                  Hotel QR Code Management
+                </h2>
+              </div>
+              <p className={`text-xs sm:text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                Every hotel registered in PostgreSQL has a unique dynamic QR code generated via ZXing. Scanning routes directly to the hotel&apos;s verified guest portal.
+              </p>
+            </div>
+
+            <div className="text-xs px-3 py-1.5 rounded-xl border font-mono flex items-center gap-2 text-slate-400 bg-white/5 border-white/10">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Pattern: <code>{'{BASE_URL}'}/{'{hotelId}'}</code></span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredHotels.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-slate-400 border rounded-2xl border-dashed border-white/10">
+                No registered hotels to display QR codes for.
+              </div>
+            ) : (
+              filteredHotels.map((hotel) => {
+                const destinationUrl = getDestinationUrl(hotel.id);
+                const qrImageUrl = `${getApiUrl()}/hotels/${hotel.id}/qr`;
+                const isCopied = copiedHotelId === hotel.id;
+
+                return (
+                  <div
+                    key={hotel.id}
+                    className={`rounded-2xl border p-5 flex flex-col justify-between transition-all hover:shadow-xl ${isLight
+                        ? 'bg-white border-slate-200 shadow-sm'
+                        : 'bg-[#0b1426] border-white/10 shadow-black/40'
+                      }`}
+                  >
+                    <div>
+                      {/* Top Header */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                          <h3 className="font-bold text-base sm:text-lg leading-snug text-slate-900 dark:text-slate-100">
+                            {hotel.name}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                              Hotel ID: {hotel.id}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium ${hotel.active ? 'text-emerald-500 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'
+                              }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${hotel.active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                              {hotel.active ? 'Active' : 'Suspended'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="font-mono text-xs px-2 py-1 rounded bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10">
+                          {hotel.slug}
+                        </span>
+                      </div>
+
+                      {/* QR Code Image Preview */}
+                      <div className="relative my-4 p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex flex-col items-center justify-center group">
+                        <HotelQrImage
+                          hotelId={hotel.id}
+                          destinationUrl={destinationUrl}
+                          size={168}
+                          showBadge={true}
+                        />
+                      </div>
+
+                      {/* QR Destination URL Display */}
+                      <div className="mb-4">
+                        <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                          QR Destination
+                        </label>
+                        <div
+                          className={`px-3 py-2 rounded-xl border font-mono text-xs truncate flex items-center justify-between gap-2 ${isLight
+                              ? 'bg-slate-50 border-slate-200 text-slate-700'
+                              : 'bg-black/30 border-white/10 text-slate-300'
+                            }`}
+                          title={destinationUrl}
+                        >
+                          <span className="truncate">{destinationUrl}</span>
+                          <a
+                            href={`/${hotel.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-amber-500 hover:text-amber-400 flex-shrink-0"
+                            title="Open scanned page in new tab"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons: Download QR & Copy URL */}
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 dark:border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadQr(hotel)}
+                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${isLight
+                            ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-600'
+                            : 'bg-gradient-to-r from-[#dfb96c] to-[#c79a40] hover:from-[#e8c57b] hover:to-[#d8a84a] text-slate-950 border-amber-500/40 shadow-sm'
+                          }`}
+                        title="Download high-resolution PNG QR file"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download QR</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUrl(hotel.id)}
+                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${isCopied
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                            : isLight
+                              ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                              : 'bg-white/5 border-white/10 text-slate-200 hover:bg-white/10'
+                          }`}
+                        title="Copy QR destination URL to clipboard"
+                      >
+                        {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{isCopied ? 'Copied!' : 'Copy URL'}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
       </main>
 
       {/* Provision New Hotel Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div
-            className={`w-full max-w-lg rounded-2xl p-6 sm:p-7 border shadow-2xl transition-all relative ${
-              isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#0d1629] border-white/15 text-slate-100'
-            }`}
+            className={`w-full max-w-lg rounded-2xl p-6 sm:p-7 border shadow-2xl transition-all relative ${isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#0d1629] border-white/15 text-slate-100'
+              }`}
           >
             <button
               type="button"
@@ -799,9 +1026,8 @@ export default function AdminDashboardPage() {
                   placeholder="e.g. The Grand Azure Goa"
                   value={hotelName}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${
-                    isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
-                  }`}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
+                    }`}
                 />
               </div>
 
@@ -820,9 +1046,8 @@ export default function AdminDashboardPage() {
                     placeholder="azure-goa"
                     value={hotelSlug}
                     onChange={(e) => setHotelSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    className={`w-full pl-16 pr-3.5 py-2.5 font-mono text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${
-                      isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
-                    }`}
+                    className={`w-full pl-16 pr-3.5 py-2.5 font-mono text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
+                      }`}
                   />
                 </div>
               </div>
@@ -843,9 +1068,8 @@ export default function AdminDashboardPage() {
                       placeholder="e.g. Vikram Singhania"
                       value={gmName}
                       onChange={(e) => setGmName(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${
-                        isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
-                      }`}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
+                        }`}
                     />
                   </div>
 
@@ -859,9 +1083,8 @@ export default function AdminDashboardPage() {
                       placeholder="gm.goa@thegrandadp.com"
                       value={gmEmail}
                       onChange={(e) => setGmEmail(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${
-                        isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
-                      }`}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
+                        }`}
                     />
                   </div>
 
@@ -878,9 +1101,8 @@ export default function AdminDashboardPage() {
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${
-                          isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
-                        }`}
+                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-400 ${isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-[#070c18] border-white/10 text-white'
+                          }`}
                       />
                     </div>
                   </div>
@@ -894,9 +1116,8 @@ export default function AdminDashboardPage() {
                     setIsModalOpen(false);
                     resetForm();
                   }}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-medium border cursor-pointer ${
-                    isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-100' : 'border-white/10 text-slate-300 hover:bg-white/5'
-                  }`}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-medium border cursor-pointer ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-100' : 'border-white/10 text-slate-300 hover:bg-white/5'
+                    }`}
                 >
                   Cancel
                 </button>
@@ -918,9 +1139,8 @@ export default function AdminDashboardPage() {
       {hotelToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div
-            className={`w-full max-w-md rounded-2xl p-6 sm:p-7 border shadow-2xl transition-all relative ${
-              isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#0d1629] border-white/15 text-slate-100'
-            }`}
+            className={`w-full max-w-md rounded-2xl p-6 sm:p-7 border shadow-2xl transition-all relative ${isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#0d1629] border-white/15 text-slate-100'
+              }`}
           >
             <div className="flex items-center gap-3.5 mb-4">
               <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center font-bold">
@@ -942,9 +1162,8 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setHotelToDelete(null)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-medium border cursor-pointer ${
-                  isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-100' : 'border-white/10 text-slate-300 hover:bg-white/5'
-                }`}
+                className={`px-4 py-2.5 rounded-xl text-xs font-medium border cursor-pointer ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-100' : 'border-white/10 text-slate-300 hover:bg-white/5'
+                  }`}
               >
                 Cancel
               </button>
@@ -956,6 +1175,102 @@ export default function AdminDashboardPage() {
                 className="px-5 py-2.5 rounded-xl font-semibold text-xs text-white bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-900/20 transition-all cursor-pointer disabled:opacity-60"
               >
                 {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hotel QR Code Focus Modal */}
+      {qrModalHotel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-md rounded-2xl p-6 sm:p-7 border shadow-2xl transition-all relative ${isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-[#0d1629] border-white/15 text-slate-100'
+              }`}
+          >
+            <button
+              type="button"
+              onClick={() => setQrModalHotel(null)}
+              className="absolute right-5 top-5 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-bold">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  {qrModalHotel.name}
+                </h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="font-mono text-xs text-amber-500 font-semibold">
+                    Hotel ID #{qrModalHotel.id}
+                  </span>
+                  <span className="text-slate-400 text-xs">&bull;</span>
+                  <span className="font-mono text-xs text-slate-400">
+                    {qrModalHotel.slug}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Centered QR Image */}
+            <div className="my-5 p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex flex-col items-center justify-center">
+              <HotelQrImage
+                hotelId={qrModalHotel.id}
+                destinationUrl={getDestinationUrl(qrModalHotel.id)}
+                size={210}
+                showBadge={true}
+              />
+            </div>
+
+            {/* Destination URL */}
+            <div className="mb-5">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                Destination URL
+              </label>
+              <div
+                className={`p-2.5 rounded-xl border font-mono text-xs flex items-center justify-between gap-2 ${isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-black/30 border-white/10 text-slate-200'
+                  }`}
+              >
+                <span className="truncate">{getDestinationUrl(qrModalHotel.id)}</span>
+                <a
+                  href={`/${qrModalHotel.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-500 hover:text-amber-400"
+                  title="Test Scan / Open"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200/50 dark:border-white/5">
+              <button
+                type="button"
+                onClick={() => handleDownloadQr(qrModalHotel)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs text-slate-950 bg-gradient-to-r from-[#dfb96c] to-[#c79a40] hover:from-[#e8c57b] hover:to-[#d8a84a] shadow-md transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download PNG</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCopyUrl(qrModalHotel.id)}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs border transition-all cursor-pointer ${copiedHotelId === qrModalHotel.id
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : isLight
+                      ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                      : 'bg-white/5 border-white/10 text-slate-200 hover:bg-white/10'
+                  }`}
+              >
+                {copiedHotelId === qrModalHotel.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedHotelId === qrModalHotel.id ? 'Copied URL!' : 'Copy URL'}</span>
               </button>
             </div>
           </div>
