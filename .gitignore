@@ -24,6 +24,8 @@ frontend/.env
 
 # Java Spring Boot Backend Build Artifacts
 backend/target/
+backend/.mvn/wrapper/dists/
+backend/.m2/
 backend/*.jar
 backend/*.war
 backend/*.log

@@ -70,7 +70,7 @@ interface TopBarProps {
 export function TopBar({ active, showRail = true, hideGestureButton = false }: TopBarProps) {
   const router = useRouter();
   const { t } = useI18n();
-  const { state, reset, setTheme, markNotificationRead, clearAllNotifications, gestureGuideOpen, setGestureGuideOpen } = useDemo();
+  const { state, reset, setTheme, markNotificationRead, clearAllNotifications, gestureGuideOpen, setGestureGuideOpen, currentHotelName, currentHotelSlug } = useDemo();
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [policiesModalOpen, setPoliciesModalOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -217,7 +217,16 @@ export function TopBar({ active, showRail = true, hideGestureButton = false }: T
               <Hotel className="h-5 w-5" aria-hidden />
             </span>
             <span className="leading-tight">
-              <span className={cn("block font-display text-white", isFd ? "text-sm sm:text-base leading-snug" : "text-lg")}>The Grand ADP</span>
+              <span className="flex items-center gap-2">
+                <span className={cn("block font-display text-white", isFd ? "text-sm sm:text-base leading-snug" : "text-lg")}>
+                  {currentHotelName || 'The Grand ADP'}
+                </span>
+                {currentHotelSlug && currentHotelSlug !== 'grand-adp' && (
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                    {currentHotelSlug}
+                  </span>
+                )}
+              </span>
               <span className={cn("block uppercase text-mist-400", isFd ? "text-[9px] tracking-[0.2em]" : "text-[10px] tracking-[0.22em]")}>
                 {isRole ? `${role?.name} Portal` : 'Resort · Staff Portals'}
               </span>

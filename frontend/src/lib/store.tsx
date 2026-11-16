@@ -118,6 +118,8 @@ import type {
   GuestIncidentStatus,
   GuestIncidentRecord,
   GuestIncidentAttachment,
+  CustomFloorInfo,
+  CustomRoomSpec,
 } from '@/types/demo';
 
 import { migrateOperationalReferences, nextOperationalReference, taskReferenceInitial } from './operational-references';
@@ -230,6 +232,72 @@ function seedState(normalize = true): DemoState {
   return normalize ? migrateOperationalReferences(seed) : seed;
 }
 
+export function getTenantStorageKey(slug?: string): string {
+  if (!slug || slug === 'grand-adp') {
+    return STORAGE_KEY;
+  }
+  return `hotel_tenant_${slug}_v1`;
+}
+
+export function seedFreshTenantState(slug: string, name?: string): DemoState {
+  const base = seedState(false);
+  const hotelLabel = name || slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return {
+    ...base,
+    persona: null,
+    items: {
+      task_fulfiller: [],
+      department_dispatcher_supervisor: [],
+      department_dispatcher: [],
+      department_supervisor: [],
+      front_desk_coordinator: [],
+      general_manager: [],
+      executive_viewer: [],
+    },
+    feed: [],
+    notifications: [],
+    auditTrail: [
+      {
+        id: `tenant-init-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        actor: 'Platform Administrator',
+        actorRole: 'Platform Administrator',
+        action: `Fresh Hotel Tenant '${hotelLabel}' initialized with clean operational state.`,
+        category: 'Access',
+        resource: 'Tenant Initialization',
+        outcome: 'success',
+      },
+    ],
+    bookings: [],
+    folios: {},
+    lostFound: [],
+    incidents: [],
+    invoices: [],
+    transactions: [],
+    refundRequests: [],
+    inspections: [],
+    guestMessages: [],
+    compensationRequests: [],
+    guestReminders: [],
+    safetyAlerts: [],
+    customDiningRequests: [],
+    guestCompensationRefundRequests: [],
+    guestIncidents: [],
+    supervisorEscalations: [],
+    dutyStatusRequests: [],
+    guestComplaints: [],
+    taskReassignRequests: [],
+    resourceRequests: [],
+    shiftHandovers: [],
+    frontDesk: {
+      rooms: base.frontDesk?.rooms || [],
+      stays: [],
+      sync: [],
+      complaints: [],
+    },
+  };
+}
+
 export interface Toast {
   id: number;
   text: string;
@@ -265,6 +333,14 @@ interface DemoApi {
   toasts: Toast[];
   state: DemoState;
   hydrated: boolean;
+  currentHotelSlug: string;
+  currentHotelName: string;
+  setCurrentHotelSlug: (slug: string, name?: string) => void;
+  resetTenantToFreshState: (slug: string) => void;
+  addFloor: (floor: number, name?: string, wing?: string) => void;
+  removeFloor: (floor: number) => void;
+  addRoom: (room: CustomRoomSpec) => void;
+  removeRoom: (roomNo: string) => void;
   setPersona: (id: RoleId) => void;
   advance: (roleId: RoleId, itemId: string, t: Transition, reason?: string) => void;
   cycleIntegration: (id: string) => void;
@@ -599,6 +675,8 @@ const ORDER_LIFECYCLE: LifecycleStep[] = [
 ];
 
 export function DemoProvider({ children }: { children: ReactNode }) {
+  const [currentHotelSlug, setCurrentHotelSlugState] = useState<string>('grand-adp');
+  const [currentHotelName, setCurrentHotelNameState] = useState<string>('The Grand ADP');
   const [state, setStoredState] = useState<DemoState>(() => seedState());
   const setState = useCallback((update: DemoState | ((previous: DemoState) => DemoState)) => {
     setStoredState(previous => (typeof update === 'function' ? update(previous) : update));
@@ -620,10 +698,30 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   // Load persisted demo state once, after mount (avoids hydration mismatches).
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+      let initialSlug = 'grand-adp';
+      if (typeof window !== 'undefined') {
+        const storedAuth = window.localStorage.getItem('authUser');
+        if (storedAuth) {
+          try {
+            const parsed = JSON.parse(storedAuth);
+            if (parsed.hotelSlug) initialSlug = parsed.hotelSlug;
+          } catch {}
+        }
+        // Pathname inspection for direct deep link
+        const pathMatch = window.location.pathname.match(/\/hotel\/([^/]+)/);
+        if (pathMatch && pathMatch[1]) {
+          initialSlug = pathMatch[1];
+        }
+      }
+      setCurrentHotelSlugState(initialSlug);
+      const initialName = initialSlug === 'grand-adp' ? 'The Grand ADP' : initialSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      setCurrentHotelNameState(initialName);
+
+      const tenantKey = getTenantStorageKey(initialSlug);
+      const raw = window.localStorage.getItem(tenantKey);
       if (raw) {
         const saved = JSON.parse(raw) as Partial<DemoState>;
-        const base = seedState(false);
+        const base = initialSlug !== 'grand-adp' ? seedFreshTenantState(initialSlug, initialName) : seedState(false);
         const mergedState: DemoState = {
           persona: saved.persona ?? null,
           items: {
@@ -785,11 +883,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const key = getTenantStorageKey(currentHotelSlug);
+      window.localStorage.setItem(key, JSON.stringify(state));
     } catch {
       /* storage full or blocked: demo still works in memory */
     }
-  }, [state, hydrated]);
+  }, [state, hydrated, currentHotelSlug]);
 
   // Keep the whole site on one theme: mirror it onto <html data-theme> and class.
   useEffect(() => {
@@ -6082,17 +6181,155 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const reset = useCallback(() => {
+  const setCurrentHotelSlug = useCallback((slug: string, name?: string) => {
+    if (!slug) return;
+    setCurrentHotelSlugState(slug);
+    const label = name || (slug === 'grand-adp' ? 'The Grand ADP' : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+    setCurrentHotelNameState(label);
+
     try {
-      window.localStorage.removeItem(STORAGE_KEY);
+      const key = getTenantStorageKey(slug);
+      const raw = window.localStorage.getItem(key);
+      if (raw) {
+        setStoredState(JSON.parse(raw));
+      } else if (slug !== 'grand-adp') {
+        const fresh = seedFreshTenantState(slug, label);
+        setStoredState(fresh);
+        window.localStorage.setItem(key, JSON.stringify(fresh));
+      } else {
+        setStoredState(seedState(false));
+      }
+    } catch {
+      /* ignore storage read error */
+    }
+  }, []);
+
+  const resetTenantToFreshState = useCallback((slug: string) => {
+    const key = getTenantStorageKey(slug);
+    try {
+      window.localStorage.removeItem(key);
+    } catch {}
+    const fresh = seedFreshTenantState(slug);
+    setStoredState(fresh);
+    try {
+      window.localStorage.setItem(key, JSON.stringify(fresh));
+    } catch {}
+    notify(`Hotel tenant '${slug}' reset to clean operational state`);
+  }, [notify]);
+
+  const reset = useCallback(() => {
+    const key = getTenantStorageKey(currentHotelSlug);
+    try {
+      window.localStorage.removeItem(key);
     } catch {
       /* ignore */
     }
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    setStoredState({ ...seedState(), theme: stateRef.current.theme });
-    notify('Demo data reset to its initial state');
-  }, [notify]);
+    if (currentHotelSlug !== 'grand-adp') {
+      const fresh = seedFreshTenantState(currentHotelSlug, currentHotelName);
+      setStoredState({ ...fresh, theme: stateRef.current.theme });
+      notify(`Hotel ${currentHotelName} reset to clean state`);
+    } else {
+      setStoredState({ ...seedState(), theme: stateRef.current.theme });
+      notify('Demo data reset to its initial state');
+    }
+  }, [notify, currentHotelSlug, currentHotelName]);
+
+  const addFloor = useCallback((floor: number, name?: string, wing?: string) => {
+    const floorName = name || `FLOOR ${floor}`;
+    const wingName = wing || `Floor ${floor} Wing`;
+    setState((prev) => {
+      const existingFloors = prev.customFloors ?? [];
+      const updatedFloors = existingFloors.some((f) => f.floor === floor)
+        ? existingFloors.map((f) => (f.floor === floor ? { floor, name: floorName, wing: wingName } : f))
+        : [...existingFloors, { floor, name: floorName, wing: wingName }];
+
+      const updatedRemoved = (prev.removedFloors ?? []).filter((f) => f !== floor);
+      return {
+        ...prev,
+        customFloors: updatedFloors,
+        removedFloors: updatedRemoved,
+      };
+    });
+    notify(`Floor ${floor} added to inventory`);
+  }, [notify, setState]);
+
+  const removeFloor = useCallback((floor: number) => {
+    setState((prev) => {
+      const updatedRemoved = Array.from(new Set([...(prev.removedFloors ?? []), floor]));
+      const updatedCustom = (prev.customFloors ?? []).filter((f) => f.floor !== floor);
+      return {
+        ...prev,
+        removedFloors: updatedRemoved,
+        customFloors: updatedCustom,
+      };
+    });
+    notify(`Floor ${floor} removed from inventory`);
+  }, [notify, setState]);
+
+  const addRoom = useCallback((room: CustomRoomSpec) => {
+    setState((prev) => {
+      const existingCustom = prev.customRooms ?? [];
+      const updatedCustom = existingCustom.some((r) => r.no === room.no)
+        ? existingCustom.map((r) => (r.no === room.no ? room : r))
+        : [...existingCustom, room];
+
+      const updatedRemoved = (prev.removedRoomNos ?? []).filter((no) => no !== room.no);
+
+      const existingFdRooms = prev.frontDesk?.rooms ?? [];
+      const updatedFdRooms = existingFdRooms.some((r) => r.no === room.no)
+        ? existingFdRooms.map((r) =>
+            r.no === room.no
+              ? {
+                  ...r,
+                  floor: room.floor,
+                  readiness: room.readiness ?? r.readiness,
+                  occupied: room.occupied ?? r.occupied,
+                }
+              : r,
+          )
+        : [
+            ...existingFdRooms,
+            {
+              no: room.no,
+              floor: room.floor,
+              readiness: room.readiness ?? 'ready',
+              occupied: room.occupied ?? false,
+              dnd: room.dnd ?? false,
+            },
+          ];
+
+      return {
+        ...prev,
+        customRooms: updatedCustom,
+        removedRoomNos: updatedRemoved,
+        frontDesk: {
+          ...prev.frontDesk,
+          rooms: updatedFdRooms,
+        },
+      };
+    });
+    notify(`Room ${room.no} (${room.typeFull}) added on Floor ${room.floor}`);
+  }, [notify, setState]);
+
+  const removeRoom = useCallback((roomNo: string) => {
+    setState((prev) => {
+      const updatedRemoved = Array.from(new Set([...(prev.removedRoomNos ?? []), roomNo]));
+      const updatedCustom = (prev.customRooms ?? []).filter((r) => r.no !== roomNo);
+      const updatedFdRooms = (prev.frontDesk?.rooms ?? []).filter((r) => r.no !== roomNo);
+      return {
+        ...prev,
+        removedRoomNos: updatedRemoved,
+        customRooms: updatedCustom,
+        frontDesk: {
+          ...prev.frontDesk,
+          rooms: updatedFdRooms,
+        },
+      };
+    });
+    notify(`Room ${roomNo} removed from inventory`);
+  }, [notify, setState]);
 
 
   const updateDndStatus = useCallback<DemoApi['updateDndStatus']>(
@@ -6828,6 +7065,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       hydrated,
+      currentHotelSlug,
+      currentHotelName,
+      setCurrentHotelSlug,
+      resetTenantToFreshState,
+      addFloor,
+      removeFloor,
+      addRoom,
+      removeRoom,
       setPersona,
       advance,
       cycleIntegration,
@@ -7086,6 +7331,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       setGestureGuideOpen,
       resetActionableExamples,
       toasts,
+      currentHotelSlug,
+      currentHotelName,
+      setCurrentHotelSlug,
+      resetTenantToFreshState,
+      addFloor,
+      removeFloor,
+      addRoom,
+      removeRoom,
     ],
   );
 

@@ -93,7 +93,7 @@ if "%1" == "-q" (
 if exist "%WRAPPER_JAR%" goto run
 
 echo Downloader will be used to fetch maven-wrapper.jar
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile(%WRAPPER_URL%, '%WRAPPER_JAR%')}"
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('%WRAPPER_URL%', '%WRAPPER_JAR%')}"
 
 if exist "%WRAPPER_JAR%" goto run
 

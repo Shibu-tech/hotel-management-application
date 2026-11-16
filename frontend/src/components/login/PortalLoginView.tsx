@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './portal-login.css';
@@ -17,12 +17,8 @@ import {
   Smartphone,
   ClipboardCheck,
   Radio,
-  Gauge,
   BellRing,
-  Wallet,
-  ShieldAlert,
   Crown,
-  Sliders,
   Globe,
   Info,
   Sparkles,
@@ -31,6 +27,8 @@ import {
   UtensilsCrossed,
   ChevronDown,
   Check,
+  ShieldAlert,
+  AlertCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { useDemo } from '@/lib/store';
@@ -42,7 +40,7 @@ import {
 } from '@/components/staff/fulfiller/fulfillerProfiles';
 import type { RoleId, DispatcherDepartment } from '@/types/demo';
 
-interface PresetRole {
+export interface PresetRole {
   id: string;
   num: string;
   name: string;
@@ -54,37 +52,54 @@ interface PresetRole {
   personaId?: RoleId;
 }
 
+export interface HotelOption {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+const DEFAULT_PUBLIC_HOTELS: HotelOption[] = [
+  { id: 1, name: 'The Grand ADP (Flagship)', slug: 'grand-adp' },
+  { id: 2, name: 'The Grand Palace Mumbai', slug: 'palace-mumbai' },
+];
+
+/**
+ * Requirement 3:
+ * The 6 primary roles for the Quick Role Fill panel:
+ * Admin, General Manager, Supervisor, Front Desk, Fulfiller, and Guest Portal.
+ * Clicking any role card only pre-fills email and password to assist testing.
+ */
 const PRESET_ROLES: PresetRole[] = [
   {
-    id: 'guest',
+    id: 'admin',
     num: '00',
-    name: 'Guest Portal',
-    email: 'guest@thegrandadp.com',
-    pass: 'guest123',
-    icon: Smartphone,
-    color: 'from-cyan-500 to-teal-500',
-    path: '/guest/portal?room=402&token=demo-token',
+    name: 'Admin',
+    email: 'admin@thegrandadp.com',
+    pass: 'admin123',
+    icon: ShieldAlert,
+    color: 'from-purple-500 to-indigo-600',
+    path: '/admin/dashboard',
   },
   {
-    id: 'fulfiller',
+    id: 'gm',
     num: '01',
-    name: 'Task Fulfiller',
-    email: 'fulfiller@thegrandadp.com',
-    pass: 'task123',
-    icon: ClipboardCheck,
-    color: 'from-emerald-500 to-teal-600',
-    path: '/staff/fulfiller',
-    personaId: 'task_fulfiller',
+    name: 'General Manager',
+    email: 'gm@thegrandadp.com',
+    pass: 'gm123',
+    icon: Crown,
+    color: 'from-amber-500 to-orange-600',
+    path: '/hotel/grand-adp/gm',
+    personaId: 'general_manager',
   },
   {
     id: 'dispatcher',
     num: '02',
-    name: 'Dispatcher / Supervisor',
+    name: 'Supervisor',
     email: 'dispatcher@thegrandadp.com',
     pass: 'dispatch123',
     icon: Radio,
     color: 'from-sky-500 to-blue-600',
-    path: '/staff/dispatcher-supervisor',
+    path: '/hotel/grand-adp/supervisor',
     personaId: 'department_dispatcher_supervisor',
   },
   {
@@ -95,19 +110,29 @@ const PRESET_ROLES: PresetRole[] = [
     pass: 'desk123',
     icon: BellRing,
     color: 'from-pink-500 to-rose-600',
-    path: '/staff/front-desk',
+    path: '/hotel/grand-adp/front-desk',
     personaId: 'front_desk_coordinator',
   },
   {
-    id: 'gm',
+    id: 'fulfiller',
     num: '04',
-    name: 'General Manager',
-    email: 'gm@thegrandadp.com',
-    pass: 'gm123',
-    icon: Crown,
-    color: 'from-amber-500 to-orange-600',
-    path: '/staff/general-manager',
-    personaId: 'general_manager',
+    name: 'Fulfiller',
+    email: 'fulfiller@thegrandadp.com',
+    pass: 'task123',
+    icon: ClipboardCheck,
+    color: 'from-emerald-500 to-teal-600',
+    path: '/hotel/grand-adp/fulfiller',
+    personaId: 'task_fulfiller',
+  },
+  {
+    id: 'guest',
+    num: '05',
+    name: 'Guest Portal',
+    email: 'guest@thegrandadp.com',
+    pass: 'guest123',
+    icon: Smartphone,
+    color: 'from-cyan-500 to-teal-500',
+    path: '/hotel/grand-adp/guest',
   },
 ];
 
@@ -117,7 +142,6 @@ export interface DispatcherDeptOption {
   name: string;
   email: string;
   pass: string;
-  path: string;
   description: string;
   icon: LucideIcon;
   color: string;
@@ -130,7 +154,6 @@ export const DISPATCHER_DEPARTMENTS: DispatcherDeptOption[] = [
     name: 'Housekeeping',
     email: 'dispatcher.housekeeping@thegrandadp.com',
     pass: 'dispatch123',
-    path: '/staff/dispatcher-supervisor?dept=housekeeping',
     description: 'Turnover, deep clean, linen logistics & quality inspections',
     icon: Sparkles,
     color: 'from-emerald-500 to-teal-600',
@@ -141,7 +164,6 @@ export const DISPATCHER_DEPARTMENTS: DispatcherDeptOption[] = [
     name: 'Wellness',
     email: 'dispatcher.wellness@thegrandadp.com',
     pass: 'dispatch123',
-    path: '/staff/dispatcher-supervisor?dept=wellness',
     description: 'Spa treatments, hydrotherapy pools & wellness sessions',
     icon: HeartPulse,
     color: 'from-teal-500 to-cyan-600',
@@ -152,7 +174,6 @@ export const DISPATCHER_DEPARTMENTS: DispatcherDeptOption[] = [
     name: 'Maintenance & Engineering',
     email: 'dispatcher.engineering@thegrandadp.com',
     pass: 'dispatch123',
-    path: '/staff/dispatcher-supervisor?dept=maintenance',
     description: 'HVAC climate, plumbing, electrical & asset work orders',
     icon: Wrench,
     color: 'from-amber-500 to-orange-600',
@@ -163,7 +184,6 @@ export const DISPATCHER_DEPARTMENTS: DispatcherDeptOption[] = [
     name: 'Food & Beverages',
     email: 'dispatcher.fnb@thegrandadp.com',
     pass: 'dispatch123',
-    path: '/staff/dispatcher-supervisor?dept=fnb',
     description: 'In-room dining, bar services, pantry & meal delivery',
     icon: UtensilsCrossed,
     color: 'from-purple-500 to-pink-600',
@@ -177,33 +197,25 @@ const FULFILLER_DEPARTMENTS: { key: FulfillerDeptKey; name: string }[] = [
   { key: 'fnb', name: 'Food & Beverages' },
 ];
 
-const DEMO_ACCOUNTS: PresetRole[] = [
-  ...FULFILLER_DEPARTMENTS.map((fd, index) => ({
-    id: `fulfiller-${fd.key}`,
-    num: `F${index + 1}`,
-    name: `Task Fulfiller — ${fd.name} (${FULFILLER_PROFILES[fd.key].employeeName})`,
-    email: FULFILLER_PROFILES[fd.key].email,
-    pass: 'task123',
-    icon: ClipboardCheck,
-    color: FULFILLER_PROFILES[fd.key].colorGradient,
-    path: `/staff/fulfiller?dept=${fd.key}`,
-    personaId: 'task_fulfiller' as const,
-  })),
-  ...PRESET_ROLES,
-];
-
 export function PortalLoginView() {
   const router = useRouter();
   const { state, setTheme, setPersona, setActiveDispatcherDept } = useDemo();
   const { t } = useI18n();
 
+  // Multi-Hotel Tenant Selector State
+  const [isMultiHotel, setIsMultiHotel] = useState(false);
+  const [availableHotels, setAvailableHotels] = useState<HotelOption[]>(DEFAULT_PUBLIC_HOTELS);
+  const [selectedHotelSlug, setSelectedHotelSlug] = useState('grand-adp');
+  const [isLoadingHotels, setIsLoadingHotels] = useState(false);
+
+  // Department Dropdowns
   const [dispatcherDropdownOpen, setDispatcherDropdownOpen] = useState(false);
   const [fulfillerDropdownOpen, setFulfillerDropdownOpen] = useState(false);
-
   const [selectedDept, setSelectedDept] = useState<DispatcherDepartment>(
     state.activeDispatcherDept || 'Housekeeping',
   );
 
+  // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -212,6 +224,7 @@ export function PortalLoginView() {
   const [previewFulfillerDept, setPreviewFulfillerDept] = useState<FulfillerDeptKey>('housekeeping');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const isLight = state.theme === 'light';
 
@@ -223,7 +236,7 @@ export function PortalLoginView() {
     if (!toastMessage) return;
     const timer = setTimeout(() => {
       setToastMessage(null);
-    }, 2500);
+    }, 2800);
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
@@ -239,22 +252,50 @@ export function PortalLoginView() {
     }
   }, [isLight, state.theme]);
 
-  const handleSelectFulfillerDept = (dept: FulfillerDeptKey) => {
-    setPreviewFulfillerDept(dept);
-    const profile = FULFILLER_PROFILES[dept];
-    setSelectedRoleId('fulfiller');
-    setEmail(profile.email);
-    setPassword('task123');
-    showToast(`Task Fulfiller (${profile.departmentName}) loaded`);
+  const getApiUrl = () => {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
   };
 
+  // Fetch active hotels for Multi-Hotel mode
+  const fetchPublicHotels = useCallback(async () => {
+    setIsLoadingHotels(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/hotels/public-list`);
+      if (res.ok) {
+        const data: HotelOption[] = await res.json();
+        if (data && data.length > 0) {
+          setAvailableHotels(data);
+          if (!data.some((h) => h.slug === selectedHotelSlug)) {
+            setSelectedHotelSlug(data[0].slug);
+          }
+        }
+      }
+    } catch {
+      // Backend offline: keep DEFAULT_PUBLIC_HOTELS
+    } finally {
+      setIsLoadingHotels(false);
+    }
+  }, [selectedHotelSlug]);
+
+  useEffect(() => {
+    if (isMultiHotel) {
+      fetchPublicHotels();
+    }
+  }, [isMultiHotel, fetchPublicHotels]);
+
+  // Requirement: Clicking any role card ONLY pre-fills email and password
   const handleSelectRole = (role: PresetRole) => {
+    setAuthError(null);
+    setSelectedRoleId(role.id);
+
     if (role.id === 'fulfiller') {
       const nextOpen = !fulfillerDropdownOpen;
       setFulfillerDropdownOpen(nextOpen);
       setDispatcherDropdownOpen(false);
-      setSelectedRoleId('fulfiller');
-      handleSelectFulfillerDept(previewFulfillerDept);
+      const profile = FULFILLER_PROFILES[previewFulfillerDept];
+      setEmail(profile.email);
+      setPassword('task123');
+      showToast(`Fulfiller (${profile.departmentName}) credentials filled`);
       return;
     }
 
@@ -262,23 +303,30 @@ export function PortalLoginView() {
       const nextOpen = !dispatcherDropdownOpen;
       setDispatcherDropdownOpen(nextOpen);
       setFulfillerDropdownOpen(false);
-      setSelectedRoleId(role.id);
       const activeDeptConfig =
         DISPATCHER_DEPARTMENTS.find((d) => d.id === selectedDept) || DISPATCHER_DEPARTMENTS[0];
       setEmail(activeDeptConfig.email);
       setPassword(activeDeptConfig.pass);
       setActiveDispatcherDept(activeDeptConfig.id);
-      showToast(`Dispatcher / Supervisor (${activeDeptConfig.name}) loaded`);
+      showToast(`Supervisor (${activeDeptConfig.name}) credentials filled`);
       return;
     }
 
     // Single-click role
     setDispatcherDropdownOpen(false);
     setFulfillerDropdownOpen(false);
-    setSelectedRoleId(role.id);
     setEmail(role.email);
     setPassword(role.pass);
-    showToast(`${role.name} loaded`);
+    showToast(`${role.name} credentials filled`);
+  };
+
+  const handleSelectFulfillerDept = (dept: FulfillerDeptKey) => {
+    setPreviewFulfillerDept(dept);
+    const profile = FULFILLER_PROFILES[dept];
+    setSelectedRoleId('fulfiller');
+    setEmail(profile.email);
+    setPassword('task123');
+    showToast(`Fulfiller (${profile.departmentName}) credentials filled`);
   };
 
   const handleSelectDepartment = (dept: DispatcherDeptOption) => {
@@ -287,7 +335,7 @@ export function PortalLoginView() {
     setEmail(dept.email);
     setPassword(dept.pass);
     setActiveDispatcherDept(dept.id);
-    showToast(`Loaded ${dept.name} Dispatcher`);
+    showToast(`Supervisor (${dept.name}) credentials filled`);
   };
 
   const handleReset = () => {
@@ -296,7 +344,8 @@ export function PortalLoginView() {
     setSelectedRoleId(null);
     setDispatcherDropdownOpen(false);
     setFulfillerDropdownOpen(false);
-    showToast('Cleared');
+    setAuthError(null);
+    showToast('Form cleared');
   };
 
   const handleToggleTheme = () => {
@@ -306,109 +355,127 @@ export function PortalLoginView() {
 
   const handleForgotPassword = () => {
     if (email.trim()) {
-      showToast(`Reset email sent to ${email.trim()}`);
+      showToast(`Password reset link sent to ${email.trim()}`);
     } else {
       showToast('Enter your email address first');
     }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  /**
+   * Requirement 3:
+   * Dynamic Redirection upon successful form submission.
+   * Calls POST /api/auth/login, obtains JWT with role, hotelSlug, and computed redirectUrl.
+   */
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
-    const cleanEmail = email.trim().toLowerCase();
-
-    const isFulfiller =
-      selectedRoleId === 'fulfiller' ||
-      selectedRoleId?.startsWith('fulfiller-') ||
-      cleanEmail.includes('fulfiller');
-
-    if (isFulfiller) {
-      let targetDept: FulfillerDeptKey = previewFulfillerDept;
-      if (cleanEmail.includes('wellness')) targetDept = 'wellness';
-      else if (cleanEmail.includes('eng') || cleanEmail.includes('maint')) targetDept = 'maintenance';
-      else if (cleanEmail.includes('dining') || cleanEmail.includes('fnb') || cleanEmail.includes('food'))
-        targetDept = 'fnb';
-      else if (cleanEmail.includes('housekeeping')) targetDept = 'housekeeping';
-
-      setIsSubmitting(true);
-      setPersona('task_fulfiller');
-      showToast(`Signing in as Task Fulfiller (${FULFILLER_PROFILES[targetDept].departmentName})...`);
-      router.push(`/staff/fulfiller?dept=${targetDept}`);
-      return;
-    }
-
-    const isDispatcher =
-      selectedRoleId === 'dispatcher' ||
-      cleanEmail.includes('dispatcher') ||
-      cleanEmail.includes('housekeeping') ||
-      cleanEmail.includes('wellness') ||
-      cleanEmail.includes('engineering') ||
-      cleanEmail.includes('maintenance') ||
-      cleanEmail.includes('fnb');
-
+    setAuthError(null);
     setIsSubmitting(true);
 
-    if (isDispatcher) {
-      let targetDept: DispatcherDepartment = selectedDept;
-      let deptSlug = 'housekeeping';
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
-      if (cleanEmail.includes('wellness') || (selectedRoleId === 'dispatcher' && selectedDept === 'Wellness')) {
-        targetDept = 'Wellness';
-        deptSlug = 'wellness';
-      } else if (
-        cleanEmail.includes('engineering') ||
-        cleanEmail.includes('maintenance') ||
-        (selectedRoleId === 'dispatcher' && selectedDept === 'Maintenance & Engineering')
-      ) {
-        targetDept = 'Maintenance & Engineering';
-        deptSlug = 'maintenance';
-      } else if (
-        cleanEmail.includes('fnb') ||
-        cleanEmail.includes('food') ||
-        (selectedRoleId === 'dispatcher' && selectedDept === 'Food & Beverages')
-      ) {
-        targetDept = 'Food & Beverages';
-        deptSlug = 'fnb';
+    const payload = {
+      email: cleanEmail,
+      password: cleanPassword,
+      hotelSlug: isMultiHotel ? selectedHotelSlug : undefined,
+    };
+
+    try {
+      const res = await fetch(`${getApiUrl()}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.message || `Authentication failed (HTTP ${res.status})`);
+      }
+
+      const authData = await res.json();
+
+      // Store JWT token & session
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('authToken', authData.token);
+        localStorage.setItem('authUser', JSON.stringify(authData));
+      }
+
+      // Sync persona for staff consoles
+      if (authData.role === 'GENERAL_MANAGER') {
+        setPersona('general_manager');
+      } else if (authData.role === 'SUPERVISOR') {
+        setPersona('department_dispatcher_supervisor');
+      } else if (authData.role === 'FRONT_DESK') {
+        setPersona('front_desk_coordinator');
+      } else if (authData.role === 'FULFILLER') {
+        setPersona('task_fulfiller');
+      }
+
+      showToast(`Welcome ${authData.fullName || authData.email}! Routing...`);
+
+      // Dynamic routing to redirectUrl returned by backend
+      const targetUrl = authData.redirectUrl || '/admin/dashboard';
+      router.push(targetUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login failed';
+
+      // If backend is unreachable (offline dev mode), perform client-side fallback
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
+        handleOfflineFallback(cleanEmail);
       } else {
-        targetDept = 'Housekeeping';
-        deptSlug = 'housekeeping';
+        setAuthError(msg);
+        showToast(msg);
       }
-
-      setActiveDispatcherDept(targetDept);
-      setPersona('department_dispatcher_supervisor');
-      showToast(`Signing in as Dispatcher (${targetDept})...`);
-      router.push(`/staff/dispatcher-supervisor?dept=${deptSlug}`);
-      return;
-    }
-
-    const matchedRole =
-      DEMO_ACCOUNTS.find((r) => r.email.toLowerCase() === cleanEmail) ||
-      PRESET_ROLES.find((r) => r.email.toLowerCase() === cleanEmail) ||
-      (selectedRoleId ? DEMO_ACCOUNTS.find((r) => r.id === selectedRoleId) : null);
-
-    if (!matchedRole) {
-      showToast('Email or password does not match a demo account. Open credentials to autofill.');
+    } finally {
       setIsSubmitting(false);
-      return;
-    }
-
-    if (matchedRole) {
-      if (matchedRole.personaId) {
-        setPersona(matchedRole.personaId);
-      }
-      showToast(`Signing in as ${matchedRole.name}...`);
-      router.push(matchedRole.path);
     }
   };
 
+  // Graceful offline fallback if backend server is not running during local inspection
+  const handleOfflineFallback = (cleanEmail: string) => {
+    let fallbackRedirect = '/login';
+    const effectiveSlug = isMultiHotel ? selectedHotelSlug : 'grand-adp';
+
+    if (cleanEmail.includes('admin') || selectedRoleId === 'admin') {
+      fallbackRedirect = '/admin/dashboard';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'authUser',
+          JSON.stringify({ email: cleanEmail, fullName: 'Global Administrator', role: 'ADMIN' })
+        );
+      }
+    } else if (cleanEmail.includes('gm') || selectedRoleId === 'gm') {
+      setPersona('general_manager');
+      fallbackRedirect = `/hotel/${effectiveSlug}/gm`;
+    } else if (cleanEmail.includes('dispatcher') || selectedRoleId === 'dispatcher') {
+      setPersona('department_dispatcher_supervisor');
+      fallbackRedirect = `/hotel/${effectiveSlug}/supervisor`;
+    } else if (cleanEmail.includes('frontdesk') || selectedRoleId === 'frontdesk') {
+      setPersona('front_desk_coordinator');
+      fallbackRedirect = `/hotel/${effectiveSlug}/front-desk`;
+    } else if (cleanEmail.includes('fulfiller') || selectedRoleId === 'fulfiller') {
+      setPersona('task_fulfiller');
+      fallbackRedirect = `/hotel/${effectiveSlug}/fulfiller`;
+    } else if (cleanEmail.includes('guest') || selectedRoleId === 'guest') {
+      fallbackRedirect = `/hotel/${effectiveSlug}/guest`;
+    } else {
+      setAuthError('Invalid credentials. Select a role from the Quick Role Fill panel to autofill.');
+      return;
+    }
+
+    showToast(`Offline test mode: routing to ${fallbackRedirect}`);
+    router.push(fallbackRedirect);
+  };
+
   // Determine active display name and indicator badge color
-  let activeRoleDisplayName = 'Standard';
+  let activeRoleDisplayName = 'Standard Credentials';
   let activeRoleDotClass = 'bg-slate-400';
 
   if (selectedRoleId) {
     if (selectedRoleId === 'dispatcher') {
-      activeRoleDisplayName = `Dispatcher (${selectedDept})`;
+      activeRoleDisplayName = `Supervisor (${selectedDept})`;
       activeRoleDotClass = 'bg-gradient-to-r from-sky-500 to-blue-600';
     } else if (selectedRoleId === 'fulfiller') {
       activeRoleDisplayName = `Fulfiller (${FULFILLER_PROFILES[previewFulfillerDept].departmentName})`;
@@ -429,7 +496,7 @@ export function PortalLoginView() {
       }`}
       data-theme={state.theme}
     >
-      {/* Ambient background glow elements (cyan left, purple/pink right) */}
+      {/* Ambient background glow elements */}
       <div className="glow-sphere-1" />
       <div className="glow-sphere-2" />
 
@@ -459,7 +526,7 @@ export function PortalLoginView() {
                 isLight ? 'text-slate-400' : 'text-slate-500'
               }`}
             >
-              Resort &amp; Staff Portals
+              Multi-Tenant Hospitality Portal
             </span>
           </div>
         </Link>
@@ -511,16 +578,55 @@ export function PortalLoginView() {
         </div>
       </header>
 
-      {/* Main Content Area - Scaled to 110% Zoom Proportion (max-w-[1140px]) */}
+      {/* Main Content Area */}
       <main className="relative z-10 flex-1 max-w-[1140px] w-full mx-auto px-5 sm:px-8 py-8 sm:py-12 flex flex-col justify-center">
-        <div className="mb-6">
-          <h1
-            className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${
-              isLight ? 'text-slate-900' : 'text-white'
+        {/* Title & Multi-Tenant Hotel Toggle Header */}
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1
+              className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}
+            >
+              Unified Portal Login
+            </h1>
+            <p className={`text-xs sm:text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              Seamless access for Platform Admin, General Managers, Supervisors, and Operations.
+            </p>
+          </div>
+
+          {/* Requirement 3: Hotel Selector Toggle Switch */}
+          <div
+            className={`flex items-center gap-3 px-4 py-2 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${
+              isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
             }`}
           >
-            Portal Login
-          </h1>
+            <div className="text-right">
+              <span className="text-xs font-semibold block">
+                {isMultiHotel ? 'Multi-Hotel Mode' : 'Single Hotel Mode'}
+              </span>
+              <span className="text-[10px] text-slate-400 block -mt-0.5">
+                {isMultiHotel ? 'Select property tenant' : 'Default (The Grand ADP)'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isMultiHotel}
+              onClick={() => setIsMultiHotel(!isMultiHotel)}
+              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                isMultiHotel ? 'bg-amber-500' : isLight ? 'bg-slate-300' : 'bg-slate-700'
+              }`}
+              title="Toggle Multi-Hotel Tenant Mode"
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                  isMultiHotel ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* 12-Column Grid Layout */}
@@ -561,8 +667,58 @@ export function PortalLoginView() {
                 </div>
               </div>
 
+              {/* Error Alert */}
+              {authError && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
               {/* Form */}
               <form id="loginForm" onSubmit={handleLoginSubmit} className="space-y-4 sm:space-y-5">
+                {/* Multi-Hotel Dropdown when Toggle is ON */}
+                {isMultiHotel && (
+                  <div className="animate-in fade-in duration-200">
+                    <label
+                      htmlFor="hotelSelect"
+                      className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${
+                        isLight ? 'text-slate-500' : 'text-slate-400'
+                      }`}
+                    >
+                      Hotel Property Tenant *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Building2 className="w-5 h-5 text-amber-500" />
+                      </span>
+                      <select
+                        id="hotelSelect"
+                        value={selectedHotelSlug}
+                        onChange={(e) => setSelectedHotelSlug(e.target.value)}
+                        className={`w-full pl-11 pr-8 py-3 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all appearance-none cursor-pointer ${
+                          isLight
+                            ? 'bg-slate-50 text-slate-900 border border-slate-200'
+                            : 'bg-[#070d18] text-white border border-white/10'
+                        }`}
+                      >
+                        {isLoadingHotels ? (
+                          <option disabled>Loading registered hotels...</option>
+                        ) : (
+                          availableHotels.map((hotel) => (
+                            <option key={hotel.slug} value={hotel.slug}>
+                              {hotel.name} ({hotel.slug})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                        <ChevronDown className="w-4 h-4" />
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Email Field */}
                 <div>
                   <label
@@ -668,14 +824,14 @@ export function PortalLoginView() {
                   disabled={isSubmitting}
                   className="w-full mt-3 py-3.5 px-5 rounded-xl font-semibold text-xs sm:text-sm uppercase tracking-wider text-slate-950 bg-gradient-to-r from-[#dfb96c] to-[#c79a40] hover:from-[#e8c57b] hover:to-[#d8a84a] shadow-md shadow-amber-900/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
                 >
-                  <span id="submitBtnText">{isSubmitting ? 'Signing in…' : 'Sign In'}</span>
+                  <span id="submitBtnText">{isSubmitting ? 'Authenticating…' : 'Sign In'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             </div>
           </section>
 
-          {/* RIGHT: Minimal Role Buttons Section (lg:col-span-7) */}
+          {/* RIGHT: Quick Role Fill Section (lg:col-span-7) */}
           <section className="lg:col-span-7 w-full">
             <div
               className={`rounded-2xl p-6 sm:p-7 backdrop-blur-xl transition-all portal-card-right ${
@@ -693,22 +849,16 @@ export function PortalLoginView() {
                   Quick Role Fill
                 </span>
                 <span className="text-xs font-mono text-slate-400">
-                  Select to populate
+                  Pre-fills inputs only &bull; Auth enforced
                 </span>
               </div>
 
-              {/* Minimal Role Buttons List */}
+              {/* 6 Exact Roles Grid matching requirement */}
               <div id="roleGrid" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {PRESET_ROLES.map((role) => {
                   const isFulfiller = role.id === 'fulfiller';
                   const isDispatcher = role.id === 'dispatcher';
-                  const isSelected =
-                    isFulfiller
-                      ? selectedRoleId === 'fulfiller' || selectedRoleId?.startsWith('fulfiller-')
-                      : isDispatcher
-                      ? selectedRoleId === 'dispatcher'
-                      : selectedRoleId === role.id;
-
+                  const isSelected = selectedRoleId === role.id;
                   const Icon = role.icon;
 
                   return (
@@ -754,7 +904,7 @@ export function PortalLoginView() {
                         </div>
                       </button>
 
-                      {/* Dispatcher minimal department options: ONLY name with button */}
+                      {/* Dispatcher minimal department options */}
                       {isDispatcher && dispatcherDropdownOpen && (
                         <div
                           className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${
@@ -801,7 +951,7 @@ export function PortalLoginView() {
                         </div>
                       )}
 
-                      {/* Task Fulfiller minimal department options: ONLY name with button */}
+                      {/* Task Fulfiller minimal department options */}
                       {isFulfiller && fulfillerDropdownOpen && (
                         <div
                           className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${

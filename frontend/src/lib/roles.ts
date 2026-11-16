@@ -87,12 +87,18 @@ export const roleById: Record<RoleId, RoleMeta> = {
 export function roleBySlug(slug: string): RoleMeta | undefined {
   const direct = roles.find((r) => r.slug === slug);
   if (direct) return direct;
-  // Aliases for backwards compatibility with previous routes
-  if (slug === 'dispatcher' || slug === 'supervisor') {
+  // Aliases for backwards compatibility and tenant routes
+  if (slug === 'dispatcher' || slug === 'supervisor' || slug === 'dispatcher-supervisor') {
     return roleById['department_dispatcher_supervisor'];
   }
-  if (slug === 'executive') {
+  if (slug === 'executive' || slug === 'gm' || slug === 'general-manager') {
     return roleById['general_manager'];
+  }
+  if (slug === 'front-desk') {
+    return roleById['front_desk_coordinator'];
+  }
+  if (slug === 'fulfiller') {
+    return roleById['task_fulfiller'];
   }
   return undefined;
 }

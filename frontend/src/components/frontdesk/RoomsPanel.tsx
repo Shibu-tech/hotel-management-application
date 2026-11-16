@@ -33,12 +33,15 @@ import {
   Calendar,
   Hash,
   CreditCard,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/frontdesk/Modal';
 import { useDemo } from '@/lib/store';
 import { cn, money } from '@/lib/utils';
+import { getComputedRoomsAndFloors } from '@/lib/inventoryRooms';
+import { ManageRoomsModal } from '@/components/frontdesk/ManageRoomsModal';
 import type { RoomRecord, StayRecord, Readiness, Tone } from '@/types/demo';
 
 export const READINESS_TONE: Record<Readiness, Tone> = {
@@ -94,511 +97,13 @@ export interface RoomTileData {
   pin: string;
 }
 
-// 5 floors supporting full 27-room hotel matrix
-const FLOOR_INFO: Record<number, { name: string; wing: string }> = {
-  1: { name: 'FLOOR 1', wing: 'North Garden Wing' },
-  2: { name: 'FLOOR 2', wing: 'Central Atrium Wing' },
-  3: { name: 'FLOOR 3', wing: 'East Garden Wing' },
-  4: { name: 'FLOOR 4', wing: 'Executive Suites Wing' },
-  5: { name: 'FLOOR 5', wing: 'Penthouse & Presidential Suites' },
-};
-
-function getRoomType(roomNo: string): { tag: string; full: string } {
-  if (roomNo === '127') return { tag: 'TWN', full: 'Deluxe Twin' };
-  if (roomNo === '210') return { tag: 'STE', full: 'Suite' };
-  if (roomNo === '305') return { tag: 'STE', full: 'Suite' };
-  if (roomNo.startsWith('30')) return { tag: 'STE', full: 'Executive Suite' };
-  if (roomNo === '402') return { tag: 'DLX', full: 'Deluxe King' };
-  if (roomNo.startsWith('40')) return { tag: 'RYL', full: 'Royal Suite' };
-  if (roomNo === '502' || roomNo === '506') return { tag: 'PRS', full: 'Presidential Suite' };
-  if (roomNo === '518') return { tag: 'PRS', full: 'Penthouse Grand Suite' };
-  if (roomNo.startsWith('50')) return { tag: 'PNT', full: 'Penthouse Suite' };
-  const last = parseInt(roomNo.slice(-2), 10);
-  if (last % 3 === 0) return { tag: 'TWN', full: 'Deluxe Twin' };
-  if (last % 2 === 0) return { tag: 'DLX', full: 'Deluxe King' };
-  return { tag: 'KNG', full: 'Superior King' };
-}
-
-// Deterministic mock PIN based on room number
-function getRoomPin(roomNo: string): string {
-  const n = parseInt(roomNo, 10);
-  const code = ((n * 137 + 49) % 9000) + 1000;
-  return `${code}#`;
-}
-
-interface RoomInventorySeed {
-  no: string;
-  floor: number;
-  typeTag: string;
-  typeFull: string;
-  readiness: Readiness;
-  occupied: boolean;
-  dnd?: boolean;
-  badgeStatus: 'READY' | 'OCCUPIED' | 'INSPECTION PENDING' | 'CLEANING' | 'OUT_OF_ORDER';
-  guestName?: string;
-  guestPhone?: string;
-  guestEmail?: string;
-  bookingRef?: string;
-  checkInDate?: string;
-  checkOutDate?: string;
-  duration?: string;
-  guestsCount?: number;
-  vipTier?: string;
-  folioBalance?: string;
-  preferences?: string;
-  cleanerAssigned?: string;
-  cleaningCategory?: 'guest_request' | 'cycle' | 'post_departure';
-  vip?: boolean;
-}
-
-// The exact 27-room inventory matrix matching the front desk room specification
-const ROOM_INVENTORY_27: RoomInventorySeed[] = [
-  // Floor 1 (1 room)
-  {
-    no: '127',
-    floor: 1,
-    typeTag: 'TWN',
-    typeFull: 'Deluxe Twin',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'READY',
-    guestName: 'Hannah Weiss',
-    guestPhone: '+1 (555) 349-8821',
-    guestEmail: 'hannah.weiss@voyageur.com',
-    bookingRef: 'BK-127-9481',
-    checkInDate: 'Nov 05, 2026 · 14:00',
-    checkOutDate: 'Nov 09, 2026 · 11:00',
-    duration: '4 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Gold Elite',
-    vip: true,
-    folioBalance: '₹0.00 (Settled)',
-    preferences: 'Quiet room away from elevator, hypoallergenic bedding',
-  },
-  // Floor 2 (1 room)
-  {
-    no: '210',
-    floor: 2,
-    typeTag: 'STE',
-    typeFull: 'Suite',
-    readiness: 'inspection_pending',
-    occupied: true,
-    badgeStatus: 'INSPECTION PENDING',
-    guestName: 'Tomás Silva',
-    guestPhone: '+351 912 345 678',
-    guestEmail: 'tomas.silva@skyline.org',
-    bookingRef: 'BK-210-8832',
-    checkInDate: 'Nov 04, 2026 · 15:00',
-    checkOutDate: 'Nov 08, 2026 · 12:00',
-    duration: '4 Nights · 1 Guest',
-    guestsCount: 1,
-    vipTier: 'Silver Elite',
-    vip: true,
-    folioBalance: '₹0.00 (Pre-authorized)',
-    preferences: 'Late checkout requested (13:00), extra sparkling water',
-  },
-  // Floor 3 (8 rooms)
-  {
-    no: '301',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Executive Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Liam Gallagher',
-    guestPhone: '+44 7911 123456',
-    guestEmail: 'liam.gallagher@manchester.co.uk',
-    bookingRef: 'BK-301-1102',
-    checkInDate: 'Nov 03, 2026 · 14:00',
-    checkOutDate: 'Nov 07, 2026 · 11:00',
-    duration: '4 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Club Member',
-    folioBalance: '₹12,450 (Active Folio)',
-    preferences: 'High floor, firm mattress, morning newspaper',
-  },
-  {
-    no: '302',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Executive Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Chloe Dupont',
-    guestPhone: '+33 6 12 34 56 78',
-    guestEmail: 'chloe.dupont@elysee.fr',
-    bookingRef: 'BK-302-2245',
-    checkInDate: 'Nov 05, 2026 · 13:30',
-    checkOutDate: 'Nov 08, 2026 · 11:00',
-    duration: '3 Nights · 1 Guest',
-    guestsCount: 1,
-    vipTier: 'Silver Elite',
-    folioBalance: '₹4,200 (Active Folio)',
-    preferences: 'Airport transfer required on departure, green tea bags',
-  },
-  {
-    no: '303',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Executive Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  {
-    no: '304',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Executive Suite',
-    readiness: 'cleaning',
-    occupied: false,
-    badgeStatus: 'CLEANING',
-    cleaningCategory: 'post_departure',
-    cleanerAssigned: 'Sunita Rao (Housekeeping)',
-  },
-  {
-    no: '305',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Marcus Chen',
-    guestPhone: '+1 (415) 890-2341',
-    guestEmail: 'marcus.chen@horizon.co',
-    bookingRef: 'BK-305-7712',
-    checkInDate: 'Nov 02, 2026 · 16:00',
-    checkOutDate: 'Nov 07, 2026 · 11:00',
-    duration: '5 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Platinum Elite',
-    vip: true,
-    folioBalance: '₹18,900 (Settled)',
-    preferences: 'Corner suite preference, wake-up call at 07:00, espresso pods',
-  },
-  {
-    no: '306',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Executive Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Alexander Wright',
-    guestPhone: '+1 (617) 555-0199',
-    guestEmail: 'alex.wright@cambridge.edu',
-    bookingRef: 'BK-306-4491',
-    checkInDate: 'Nov 04, 2026 · 14:00',
-    checkOutDate: 'Nov 09, 2026 · 11:00',
-    duration: '5 Nights · 1 Guest',
-    guestsCount: 1,
-    vipTier: 'Club Member',
-    folioBalance: '₹0.00 (Settled)',
-    preferences: 'High speed ethernet access, extra desk lamp',
-  },
-  {
-    no: '307',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Executive Suite',
-    readiness: 'out_of_order',
-    occupied: false,
-    badgeStatus: 'OUT_OF_ORDER',
-  },
-  {
-    no: '308',
-    floor: 3,
-    typeTag: 'STE',
-    typeFull: 'Executive Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  // Floor 4 (8 rooms)
-  {
-    no: '401',
-    floor: 4,
-    typeTag: 'RYL',
-    typeFull: 'Royal Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Devon Vance',
-    guestPhone: '+1 (212) 555-8932',
-    guestEmail: 'devon.vance@vanceholdings.com',
-    bookingRef: 'BK-401-9011',
-    checkInDate: 'Nov 01, 2026 · 12:00',
-    checkOutDate: 'Nov 10, 2026 · 12:00',
-    duration: '9 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Presidential VIP',
-    vip: true,
-    folioBalance: '₹45,000 (Active Folio)',
-    preferences: 'Chilled Dom Pérignon on arrival, Butler service on call',
-  },
-  {
-    no: '402',
-    floor: 4,
-    typeTag: 'DLX',
-    typeFull: 'Deluxe King',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Elena Rostova',
-    guestPhone: '+49 30 1234567',
-    guestEmail: 'elena.rostova@aurora-lux.com',
-    bookingRef: 'BK-402-6634',
-    checkInDate: 'Nov 03, 2026 · 15:00',
-    checkOutDate: 'Nov 08, 2026 · 11:00',
-    duration: '5 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Diamond Club',
-    vip: true,
-    folioBalance: '₹8,250 (Settled)',
-    preferences: 'Extra velvet hangers, organic fruit basket, daily fresh lilies',
-  },
-  {
-    no: '403',
-    floor: 4,
-    typeTag: 'RYL',
-    typeFull: 'Royal Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  {
-    no: '404',
-    floor: 4,
-    typeTag: 'RYL',
-    typeFull: 'Royal Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Rajesh Kulkarni',
-    guestPhone: '+91 98201 54321',
-    guestEmail: 'rajesh.kulkarni@apexcorp.in',
-    bookingRef: 'BK-404-3321',
-    checkInDate: 'Nov 04, 2026 · 14:00',
-    checkOutDate: 'Nov 07, 2026 · 11:00',
-    duration: '3 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Gold Elite',
-    vip: true,
-    folioBalance: '₹0.00 (Settled)',
-    preferences: 'Vegetarian breakfast preference, late checkout at 14:00',
-  },
-  {
-    no: '405',
-    floor: 4,
-    typeTag: 'RYL',
-    typeFull: 'Royal Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Sophia Reynolds',
-    guestPhone: '+1 (312) 555-7643',
-    guestEmail: 'sophia.reynolds@chicago-law.com',
-    bookingRef: 'BK-405-8819',
-    checkInDate: 'Nov 05, 2026 · 14:00',
-    checkOutDate: 'Nov 09, 2026 · 11:00',
-    duration: '4 Nights · 1 Guest',
-    guestsCount: 1,
-    vipTier: 'Platinum Elite',
-    vip: true,
-    folioBalance: '₹15,300 (Pre-authorized)',
-    preferences: 'Quiet room, yoga mat in room, extra sparkling mineral water',
-  },
-  {
-    no: '406',
-    floor: 4,
-    typeTag: 'RYL',
-    typeFull: 'Royal Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  {
-    no: '407',
-    floor: 4,
-    typeTag: 'RYL',
-    typeFull: 'Royal Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'David Kim',
-    guestPhone: '+82 10 1234 5678',
-    guestEmail: 'david.kim@seoul-tech.kr',
-    bookingRef: 'BK-407-7720',
-    checkInDate: 'Nov 04, 2026 · 16:00',
-    checkOutDate: 'Nov 08, 2026 · 11:00',
-    duration: '4 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Silver Elite',
-    folioBalance: '₹0.00 (Settled)',
-    preferences: 'International multi-plug adapters, extra bottled water',
-  },
-  {
-    no: '408',
-    floor: 4,
-    typeTag: 'RYL',
-    typeFull: 'Royal Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  // Floor 5 (9 rooms)
-  {
-    no: '501',
-    floor: 5,
-    typeTag: 'PNT',
-    typeFull: 'Penthouse Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Gabriel Rossi',
-    guestPhone: '+39 02 1234567',
-    guestEmail: 'gabriel.rossi@milano-design.it',
-    bookingRef: 'BK-501-1188',
-    checkInDate: 'Nov 02, 2026 · 14:00',
-    checkOutDate: 'Nov 08, 2026 · 12:00',
-    duration: '6 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Titanium Elite',
-    vip: true,
-    folioBalance: '₹32,000 (Active Folio)',
-    preferences: 'Panoramic terrace dinner reservation, espresso machine',
-  },
-  {
-    no: '502',
-    floor: 5,
-    typeTag: 'PRS',
-    typeFull: 'Presidential Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  {
-    no: '503',
-    floor: 5,
-    typeTag: 'PNT',
-    typeFull: 'Penthouse Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Maya Patel',
-    guestPhone: '+91 98110 99887',
-    guestEmail: 'maya.patel@mumbai-ventures.in',
-    bookingRef: 'BK-503-4412',
-    checkInDate: 'Nov 05, 2026 · 15:00',
-    checkOutDate: 'Nov 09, 2026 · 11:00',
-    duration: '4 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Gold Elite',
-    vip: true,
-    folioBalance: '₹0.00 (Settled)',
-    preferences: 'Late check-in arrival, herbal tea selection',
-  },
-  {
-    no: '504',
-    floor: 5,
-    typeTag: 'PNT',
-    typeFull: 'Penthouse Suite',
-    readiness: 'cleaning',
-    occupied: false,
-    badgeStatus: 'CLEANING',
-    cleaningCategory: 'cycle',
-    cleanerAssigned: 'Vikram Singh (Housekeeping)',
-  },
-  {
-    no: '505',
-    floor: 5,
-    typeTag: 'PNT',
-    typeFull: 'Penthouse Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Oliver Smith',
-    guestPhone: '+61 2 9876 5432',
-    guestEmail: 'oliver.smith@sydney-synergy.au',
-    bookingRef: 'BK-505-8831',
-    checkInDate: 'Nov 03, 2026 · 14:00',
-    checkOutDate: 'Nov 08, 2026 · 11:00',
-    duration: '5 Nights · 1 Guest',
-    guestsCount: 1,
-    vipTier: 'Silver Elite',
-    folioBalance: '₹21,500 (Pre-authorized)',
-    preferences: 'Early morning run map, gym towel setup',
-  },
-  {
-    no: '506',
-    floor: 5,
-    typeTag: 'PRS',
-    typeFull: 'Presidential Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  {
-    no: '507',
-    floor: 5,
-    typeTag: 'PNT',
-    typeFull: 'Penthouse Suite',
-    readiness: 'ready',
-    occupied: false,
-    badgeStatus: 'READY',
-  },
-  {
-    no: '508',
-    floor: 5,
-    typeTag: 'PNT',
-    typeFull: 'Penthouse Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Isabella Martinez',
-    guestPhone: '+34 91 123 4567',
-    guestEmail: 'isabella.martinez@madrid-capital.es',
-    bookingRef: 'BK-508-9923',
-    checkInDate: 'Nov 04, 2026 · 14:00',
-    checkOutDate: 'Nov 08, 2026 · 11:00',
-    duration: '4 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Club Member',
-    folioBalance: '₹0.00 (Settled)',
-    preferences: 'Extra bathrobes, late checkout at 13:00',
-  },
-  {
-    no: '518',
-    floor: 5,
-    typeTag: 'PRS',
-    typeFull: 'Penthouse Grand Suite',
-    readiness: 'ready',
-    occupied: true,
-    badgeStatus: 'OCCUPIED',
-    guestName: 'Priya Nair',
-    guestPhone: '+91 98765 43210',
-    guestEmail: 'priya.nair@summit.io',
-    bookingRef: 'BK-518-5521',
-    checkInDate: 'Nov 03, 2026 · 14:00',
-    checkOutDate: 'Nov 08, 2026 · 11:00',
-    duration: '5 Nights · 2 Guests',
-    guestsCount: 2,
-    vipTier: 'Presidential VIP',
-    vip: true,
-    folioBalance: '₹0.00 (Settled)',
-    preferences: 'VIP welcome champagne, fresh jasmine garland, executive meeting table',
-  },
-];
-
 export function RoomsPanel() {
   const { state } = useDemo();
 
   const [activeStatusFilter, setActiveStatusFilter] = useState<StatusFilterId>('all');
   const [cleaningSubfilter, setCleaningSubfilter] = useState<CleaningSubfilter>('all');
   const [selectedFloorFilter, setSelectedFloorFilter] = useState<number | 'all'>('all');
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedFloors, setCollapsedFloors] = useState<Record<number, boolean>>({});
 
@@ -630,116 +135,12 @@ export function RoomsPanel() {
   const stays = state.frontDesk?.stays ?? [];
   const stateRooms = state.frontDesk?.rooms ?? [];
 
-  // Generate complete 27 rooms matching the inventory matrix specification
-  const allRooms: RoomTileData[] = useMemo(() => {
-    return ROOM_INVENTORY_27.map((spec) => {
-      const no = spec.no;
-      const floor = spec.floor;
+  // Compute live rooms and floors dynamically from store
+  const { allRooms, floors: activeFloors, floorInfo: activeFloorInfo } = useMemo(() => {
+    return getComputedRoomsAndFloors(state, roomOverrides);
+  }, [state, roomOverrides]);
 
-      // Find existing state room if any
-      const existing = stateRooms.find((r) => r.no === no);
-      const override = roomOverrides[no];
-      const stay = stays.find((s) => s.room === no && s.status !== 'checked_out');
-      const expectedStay = stays.find((s) => s.room === no && s.status === 'expected');
-      const checkedOutStay = stays.find((s) => s.room === no && s.status === 'checked_out');
-
-      let readiness: Readiness = existing?.readiness ?? spec.readiness;
-      let occupied = existing?.occupied ?? spec.occupied;
-      let dnd = existing?.dnd ?? spec.dnd ?? false;
-      let badgeStatus = spec.badgeStatus;
-
-      // Apply local overrides if changed by user
-      if (override) {
-        if (override.readiness !== undefined) readiness = override.readiness;
-        if (override.occupied !== undefined) occupied = override.occupied;
-        if (override.dnd !== undefined) dnd = override.dnd;
-      }
-
-      let statusKind: RoomTileData['statusKind'] = 'ready';
-      let statusLabel = 'Ready';
-      let previousGuest = checkedOutStay?.guest ?? (spec.cleaningCategory === 'post_departure' ? 'Clara Dupont' : undefined);
-      let checkoutTime = checkedOutStay?.departure ?? (spec.cleaningCategory === 'post_departure' ? 'Today · 09:15 AM' : undefined);
-      let cleanerAssigned = spec.cleanerAssigned;
-      let cleaningCategory: RoomTileData['cleaningCategory'] = spec.cleaningCategory;
-      let cycleInfo: RoomTileData['cycleInfo'] = spec.cleaningCategory === 'cycle' ? {
-        dueDay: 'Due Today',
-        cycleDays: 3,
-        isOverdue: false,
-        nextScheduled: 'Today 11:30 (Day 3 of 4)',
-      } : undefined;
-
-      if (dnd) {
-        statusKind = 'dnd';
-        statusLabel = 'DND';
-        badgeStatus = 'OCCUPIED';
-      } else if (stay && stay.status === 'in_house') {
-        occupied = true;
-        badgeStatus = 'OCCUPIED';
-        if (stay.departsToday) {
-          statusKind = 'checkout';
-          statusLabel = `Check-Out · ${stay.guest.split(' ')[0]}`;
-        } else {
-          statusKind = 'occupied';
-          statusLabel = stay.guest.split(' ')[0];
-        }
-      } else if (expectedStay) {
-        statusKind = 'checkin';
-        statusLabel = `Check-In · ${expectedStay.guest.split(' ')[0]}`;
-      } else if (cleaningCategory === 'post_departure' || checkedOutStay) {
-        statusKind = 'post_departure';
-        statusLabel = readiness === 'ready' ? 'Turnover Ready' : 'Post-Departure';
-        badgeStatus = readiness === 'ready' ? 'READY' : 'CLEANING';
-      } else if (readiness === 'cleaning' || readiness === 'inspection_pending') {
-        statusKind = 'cleaning';
-        statusLabel = readiness === 'inspection_pending' ? 'Inspection' : 'Cleaning';
-        badgeStatus = readiness === 'inspection_pending' ? 'INSPECTION PENDING' : 'CLEANING';
-      } else if (readiness === 'dirty' || readiness === 'out_of_order') {
-        statusKind = 'dirty';
-        statusLabel = readiness === 'out_of_order' ? 'Out of Order' : 'Dirty';
-        badgeStatus = readiness === 'out_of_order' ? 'OUT_OF_ORDER' : 'CLEANING';
-      } else if (occupied) {
-        statusKind = 'occupied';
-        statusLabel = spec.guestName ? spec.guestName.split(' ')[0] : 'Occupied';
-        badgeStatus = 'OCCUPIED';
-      } else {
-        statusKind = 'ready';
-        statusLabel = 'Ready';
-        badgeStatus = 'READY';
-      }
-
-      return {
-        no,
-        floor,
-        readiness,
-        occupied,
-        dnd,
-        typeTag: spec.typeTag,
-        typeFull: spec.typeFull,
-        statusLabel,
-        statusKind,
-        badgeStatus,
-        guestName: stay?.guest ?? expectedStay?.guest ?? spec.guestName,
-        guestPhone: spec.guestPhone,
-        guestEmail: spec.guestEmail,
-        bookingRef: stay?.id ?? spec.bookingRef,
-        checkInDate: stay?.arrival ?? spec.checkInDate,
-        checkOutDate: stay?.departure ?? spec.checkOutDate,
-        duration: spec.duration,
-        guestsCount: spec.guestsCount ?? 2,
-        vipTier: stay?.vipTier ?? spec.vipTier,
-        folioBalance: spec.folioBalance,
-        preferences: stay?.preferencesSummary ?? spec.preferences,
-        previousGuest,
-        checkoutTime,
-        cleanerAssigned,
-        cleaningCategory,
-        cycleInfo,
-        vip: stay?.vip ?? expectedStay?.vip ?? spec.vip,
-        stay: stay ?? expectedStay ?? checkedOutStay,
-        pin: getRoomPin(no),
-      };
-    });
-  }, [stateRooms, stays, roomOverrides]);
+  const floorsList = activeFloors;
 
   // Compute live counts for left sidebar
   const counts = useMemo(() => {
@@ -795,9 +196,6 @@ export function RoomsPanel() {
       return true;
     });
   }, [allRooms, activeStatusFilter, selectedFloorFilter, searchQuery, stays]);
-
-  // Group rooms by floor (1 to 5)
-  const floorsList = [1, 2, 3, 4, 5];
 
   const toggleFloorCollapse = (fl: number) => {
     setCollapsedFloors((prev) => ({ ...prev, [fl]: !prev[fl] }));
@@ -1144,7 +542,7 @@ export function RoomsPanel() {
           >
             All Floors
           </button>
-          {[1, 2, 3, 4, 5].map((fl) => (
+          {activeFloors.map((fl) => (
             <button
               key={fl}
               type="button"
@@ -1175,6 +573,17 @@ export function RoomsPanel() {
               <RotateCcw className="h-3 w-3" /> Reset
             </button>
           )}
+
+          {/* Minimal Manage Rooms & Floors button */}
+          <button
+            type="button"
+            onClick={() => setIsManageModalOpen(true)}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 active:scale-95 transition-all shrink-0 cursor-pointer shadow-2xs"
+            title="Add or remove rooms and floors"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span>Manage Rooms</span>
+          </button>
         </div>
 
         {/* Subfilter Bar for Dirty / Cleaning if active */}

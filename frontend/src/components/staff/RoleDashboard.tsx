@@ -33,14 +33,17 @@ const BANNER_TONE: Record<Tone, string> = {
   accent: 'border-white/10 bg-white/5 text-mist-200',
 };
 
-export function RoleDashboard({ roleId }: { roleId: RoleId }) {
+export function RoleDashboard({ roleId, hotelSlug }: { roleId: RoleId; hotelSlug?: string }) {
   const role = roleById[roleId];
   const cfg = dashboards[roleId];
-  const { state, setPersona } = useDemo();
+  const { state, setPersona, setCurrentHotelSlug } = useDemo();
 
   useEffect(() => {
+    if (hotelSlug) {
+      setCurrentHotelSlug(hotelSlug);
+    }
     setPersona(roleId);
-  }, [roleId, setPersona]);
+  }, [roleId, hotelSlug, setPersona, setCurrentHotelSlug]);
 
   // Mobile-first dedicated Fulfiller app for Task Fulfillers (Attendants, Runners, Technicians)
   if (roleId === 'task_fulfiller') {

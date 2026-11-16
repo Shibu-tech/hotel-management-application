@@ -1259,6 +1259,36 @@ export interface DemoState {
   fdIncidents?: FdIncidentRecord[];
   /** ids of Front Desk notifications already read */
   fdNotifRead?: string[];
+  /** Dynamic Room & Floor Inventory Management (Front Desk & GM) */
+  customRooms?: CustomRoomSpec[];
+  customFloors?: CustomFloorInfo[];
+  removedRoomNos?: string[];
+  removedFloors?: number[];
+}
+
+export interface CustomFloorInfo {
+  floor: number;
+  name: string;
+  wing?: string;
+}
+
+export interface CustomRoomSpec {
+  no: string;
+  floor: number;
+  typeTag: string;
+  typeFull: string;
+  readiness?: Readiness;
+  occupied?: boolean;
+  dnd?: boolean;
+  pin?: string;
+  badgeStatus?: 'READY' | 'OCCUPIED' | 'INSPECTION PENDING' | 'CLEANING' | 'OUT_OF_ORDER';
+  guestName?: string;
+  guestPhone?: string;
+  guestEmail?: string;
+  bookingRef?: string;
+  vip?: boolean;
+  vipTier?: string;
+  preferences?: string;
 }
 
 /* ---- Phase 4: Guest Reminders & Safety Alert Broadcast Engine ---- */
