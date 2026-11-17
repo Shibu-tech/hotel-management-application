@@ -34,7 +34,7 @@ interface ManageRoomsModalProps {
 }
 
 export function ManageRoomsModal({ isOpen, onClose, isLight }: ManageRoomsModalProps) {
-  const { state, addFloor, removeFloor, addRoom, removeRoom } = useDemo();
+  const { state, currentHotelSlug, addFloor, removeFloor, addRoom, removeRoom } = useDemo();
 
   const [activeTab, setActiveTab] = useState<'rooms' | 'floors'>('rooms');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -62,8 +62,8 @@ export function ManageRoomsModal({ isOpen, onClose, isLight }: ManageRoomsModalP
   const [confirmDeleteRoom, setConfirmDeleteRoom] = useState<string | null>(null);
 
   const { allRooms, floors, floorInfo } = useMemo(() => {
-    return getComputedRoomsAndFloors(state);
-  }, [state]);
+    return getComputedRoomsAndFloors(state, undefined, currentHotelSlug);
+  }, [state, currentHotelSlug]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -152,7 +152,7 @@ export function ManageRoomsModal({ isOpen, onClose, isLight }: ManageRoomsModalP
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className={`w-full max-w-3xl rounded-2xl border shadow-2xl transition-all relative flex flex-col max-h-[90vh] overflow-hidden ${
           isLight
