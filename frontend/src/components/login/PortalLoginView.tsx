@@ -285,7 +285,7 @@ export function PortalLoginView() {
             }));
           }
         }
-      } catch {}
+      } catch { }
     }
 
     const finalHotels = loadedHotels && loadedHotels.length > 0 ? loadedHotels : DEFAULT_PUBLIC_HOTELS;
@@ -487,7 +487,7 @@ export function PortalLoginView() {
   };
 
   // Determine active display name and indicator badge color
-  let activeRoleDisplayName = 'Standard Credentials';
+  let activeRoleDisplayName = '';
   let activeRoleDotClass = 'bg-slate-400';
 
   if (selectedRoleId) {
@@ -508,9 +508,8 @@ export function PortalLoginView() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 relative overflow-x-hidden portal-login-root ${
-        isLight ? 'bg-slate-100 text-slate-900 light-mode' : 'bg-[#080d1a] text-slate-100 dark-mode'
-      }`}
+      className={`min-h-screen flex flex-col font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 relative overflow-x-hidden portal-login-root ${isLight ? 'bg-slate-100 text-slate-900 light-mode' : 'bg-[#080d1a] text-slate-100 dark-mode'
+        }`}
       data-theme={state.theme}
     >
       {/* Ambient background glow elements */}
@@ -519,11 +518,10 @@ export function PortalLoginView() {
 
       {/* Top Navigation Header */}
       <header
-        className={`relative z-20 px-5 sm:px-10 py-3.5 sm:py-4 flex items-center justify-between portal-login-header ${
-          isLight
+        className={`relative z-20 px-5 sm:px-10 py-3.5 sm:py-4 flex items-center justify-between portal-login-header ${isLight
             ? 'border-b border-slate-200/70 bg-[#ffffff]/80 backdrop-blur-md'
             : 'border-b border-white/10 bg-[#070c17]/80 backdrop-blur-md'
-        }`}
+          }`}
       >
         {/* Brand badge */}
         <Link href="/" className="flex items-center gap-3.5 group">
@@ -532,16 +530,14 @@ export function PortalLoginView() {
           </div>
           <div>
             <span
-              className={`font-bold text-[15px] tracking-wide block ${
-                isLight ? 'text-slate-900' : 'text-slate-100'
-              }`}
+              className={`font-bold text-[15px] tracking-wide block ${isLight ? 'text-slate-900' : 'text-slate-100'
+                }`}
             >
               The Grand ADP
             </span>
             <span
-              className={`text-[11px] block -mt-0.5 ${
-                isLight ? 'text-slate-400' : 'text-slate-500'
-              }`}
+              className={`text-[11px] block -mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'
+                }`}
             >
               Multi-Tenant Hospitality Portal
             </span>
@@ -552,11 +548,10 @@ export function PortalLoginView() {
         <div className="flex items-center gap-2.5">
           <Link
             href="/"
-            className={`hidden sm:inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all portal-header-btn ${
-              isLight
+            className={`hidden sm:inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all portal-header-btn ${isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-400 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-            }`}
+              }`}
           >
             <Globe className="w-4 h-4" />
             <span>{t('nav.publicSite')}</span>
@@ -569,11 +564,10 @@ export function PortalLoginView() {
             id="resetDemoBtn"
             onClick={handleReset}
             title="Clear form"
-            className={`inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all cursor-pointer portal-header-btn ${
-              isLight
+            className={`inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all cursor-pointer portal-header-btn ${isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-400 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-            }`}
+              }`}
           >
             <RotateCcw className="w-4 h-4" />
             <span>{t('common.clear')}</span>
@@ -584,11 +578,10 @@ export function PortalLoginView() {
             id="themeToggleBtn"
             onClick={handleToggleTheme}
             aria-label={isLight ? 'Switch to dark theme' : 'Switch to light theme'}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer portal-header-btn ${
-              isLight
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer portal-header-btn ${isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-300 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-            }`}
+              }`}
           >
             {isLight ? <Sun className="w-4.5 h-4.5 text-amber-500" /> : <Moon className="w-4.5 h-4.5 text-slate-300" />}
           </button>
@@ -601,15 +594,11 @@ export function PortalLoginView() {
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1
-              className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${
-                isLight ? 'text-slate-900' : 'text-white'
-              }`}
+              className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'
+                }`}
             >
               Unified Portal Login
             </h1>
-            <p className={`text-xs sm:text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              Seamless access for Platform Admin, General Managers, Supervisors, and Operations.
-            </p>
           </div>
 
           {/* Dynamic Hotel Property Tenant Chooser Toggle */}
@@ -620,9 +609,8 @@ export function PortalLoginView() {
             </div>
 
             <div
-              className={`flex flex-wrap items-center gap-1.5 p-1 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${
-                isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
-              }`}
+              className={`flex flex-wrap items-center gap-1.5 p-1 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
+                }`}
             >
               {availableHotels.map((hotel) => {
                 const isSelected = selectedHotelSlug === hotel.slug;
@@ -635,13 +623,12 @@ export function PortalLoginView() {
                       showToast(`Switched hotel scope to ${hotel.name}`);
                     }}
                     aria-pressed={isSelected}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                      isSelected
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${isSelected
                         ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-xs'
                         : isLight
-                        ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
+                          ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
                   >
                     <Building2 className={`w-3.5 h-3.5 ${isSelected ? 'text-slate-950' : 'text-amber-500/70'}`} />
                     <span>{hotel.name}</span>
@@ -658,31 +645,27 @@ export function PortalLoginView() {
           {/* LEFT: Clean Login Card (lg:col-span-5) */}
           <section className="lg:col-span-5 w-full">
             <div
-              className={`rounded-2xl p-7 sm:p-8 backdrop-blur-xl transition-all portal-card-left ${
-                isLight
+              className={`rounded-2xl p-7 sm:p-8 backdrop-blur-xl transition-all portal-card-left ${isLight
                   ? 'bg-[#ffffff]/95 border border-slate-200/80 shadow-xl shadow-slate-900/10'
                   : 'bg-[#0c1424]/90 border border-white/10 shadow-2xl shadow-black/50'
-              }`}
+                }`}
             >
               <div
-                className={`flex items-center justify-between pb-4 mb-6 border-b ${
-                  isLight ? 'border-slate-200/60' : 'border-white/5'
-                }`}
+                className={`flex items-center justify-between pb-4 mb-6 border-b ${isLight ? 'border-slate-200/60' : 'border-white/5'
+                  }`}
               >
                 <h2
-                  className={`text-xs sm:text-sm font-semibold tracking-wide uppercase ${
-                    isLight ? 'text-slate-500' : 'text-slate-400'
-                  }`}
+                  className={`text-xs sm:text-sm font-semibold tracking-wide uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'
+                    }`}
                 >
                   Sign In
                 </h2>
                 <div
                   id="activeRoleTag"
-                  className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium portal-active-role-tag ${
-                    isLight
+                  className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium portal-active-role-tag ${isLight
                       ? 'bg-slate-100 text-slate-600 border border-slate-200'
                       : 'bg-white/5 text-slate-300 border border-white/10'
-                  }`}
+                    }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${activeRoleDotClass}`} />
                   <span id="activeRoleName" className="truncate max-w-[150px]">
@@ -705,9 +688,8 @@ export function PortalLoginView() {
                 <div>
                   <label
                     htmlFor="emailInput"
-                    className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${
-                      isLight ? 'text-slate-500' : 'text-slate-400'
-                    }`}
+                    className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${isLight ? 'text-slate-500' : 'text-slate-400'
+                      }`}
                   >
                     Email
                   </label>
@@ -723,11 +705,10 @@ export function PortalLoginView() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@thegrandadp.com"
-                      className={`w-full pl-11 pr-4 py-3 text-sm sm:text-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all shadow-2xs portal-input ${
-                        isLight
+                      className={`w-full pl-11 pr-4 py-3 text-sm sm:text-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all shadow-2xs portal-input ${isLight
                           ? 'bg-slate-50 text-slate-900 placeholder-slate-400 border border-slate-200'
                           : 'bg-[#070d18] text-white placeholder-slate-500 border border-white/10'
-                      }`}
+                        }`}
                     />
                   </div>
                 </div>
@@ -737,18 +718,16 @@ export function PortalLoginView() {
                   <div className="flex items-center justify-between mb-2">
                     <label
                       htmlFor="passwordInput"
-                      className={`block text-xs font-semibold uppercase tracking-wider ${
-                        isLight ? 'text-slate-500' : 'text-slate-400'
-                      }`}
+                      className={`block text-xs font-semibold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'
+                        }`}
                     >
                       Password
                     </label>
                     <button
                       type="button"
                       onClick={handleForgotPassword}
-                      className={`text-xs cursor-pointer hover:underline ${
-                        isLight ? 'text-amber-600' : 'text-amber-400'
-                      }`}
+                      className={`text-xs cursor-pointer hover:underline ${isLight ? 'text-amber-600' : 'text-amber-400'
+                        }`}
                     >
                       Forgot?
                     </button>
@@ -765,11 +744,10 @@ export function PortalLoginView() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className={`w-full pl-11 pr-11 py-3 text-sm sm:text-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all shadow-2xs portal-input ${
-                        isLight
+                      className={`w-full pl-11 pr-11 py-3 text-sm sm:text-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all shadow-2xs portal-input ${isLight
                           ? 'bg-slate-50 text-slate-900 placeholder-slate-400 border border-slate-200'
                           : 'bg-[#070d18] text-white placeholder-slate-500 border border-white/10'
-                      }`}
+                        }`}
                     />
                     <button
                       type="button"
@@ -784,9 +762,8 @@ export function PortalLoginView() {
 
                 <div className="flex items-center justify-between text-xs sm:text-[13px] pt-1">
                   <label
-                    className={`flex items-center gap-2.5 cursor-pointer select-none ${
-                      isLight ? 'text-slate-600' : 'text-slate-400'
-                    }`}
+                    className={`flex items-center gap-2.5 cursor-pointer select-none ${isLight ? 'text-slate-600' : 'text-slate-400'
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -816,17 +793,15 @@ export function PortalLoginView() {
           {/* RIGHT: Quick Role Fill Section (lg:col-span-7) */}
           <section className="lg:col-span-7 w-full">
             <div
-              className={`rounded-2xl p-6 sm:p-7 backdrop-blur-xl transition-all portal-card-right ${
-                isLight
+              className={`rounded-2xl p-6 sm:p-7 backdrop-blur-xl transition-all portal-card-right ${isLight
                   ? 'bg-[#ffffff]/90 border border-slate-200/70 shadow-sm'
                   : 'bg-[#0c1424]/70 border border-white/10 shadow-sm'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between mb-4">
                 <span
-                  className={`text-xs sm:text-[13px] font-semibold uppercase tracking-wider ${
-                    isLight ? 'text-slate-500' : 'text-slate-400'
-                  }`}
+                  className={`text-xs sm:text-[13px] font-semibold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'
+                    }`}
                 >
                   Quick Role Fill
                 </span>
@@ -848,16 +823,15 @@ export function PortalLoginView() {
                       <button
                         type="button"
                         onClick={() => handleSelectRole(role)}
-                        className={`w-full text-left flex items-center justify-between p-3 sm:p-3.5 rounded-xl border transition-all duration-150 cursor-pointer portal-role-btn ${
-                          isSelected
+                        className={`w-full text-left flex items-center justify-between p-3 sm:p-3.5 rounded-xl border transition-all duration-150 cursor-pointer portal-role-btn ${isSelected
                             ? 'portal-role-selected ' +
-                              (isLight
-                                ? 'bg-amber-400/15 border-amber-400/80 text-slate-950 ring-1 ring-amber-400/30'
-                                : 'bg-amber-400/10 border-amber-400/70 text-white')
+                            (isLight
+                              ? 'bg-amber-400/15 border-amber-400/80 text-slate-950 ring-1 ring-amber-400/30'
+                              : 'bg-amber-400/10 border-amber-400/70 text-white')
                             : isLight
-                            ? 'bg-[#ffffff]/80 border-slate-200/80 hover:border-slate-300 hover:bg-[#ffffff] text-slate-700 shadow-2xs'
-                            : 'bg-white/[0.03] border-white/5 hover:border-white/20 text-slate-300'
-                        }`}
+                              ? 'bg-[#ffffff]/80 border-slate-200/80 hover:border-slate-300 hover:bg-[#ffffff] text-slate-700 shadow-2xs'
+                              : 'bg-white/[0.03] border-white/5 hover:border-white/20 text-slate-300'
+                          }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div
@@ -872,12 +846,11 @@ export function PortalLoginView() {
                         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                           {(isDispatcher || isFulfiller) && (
                             <ChevronDown
-                              className={`w-4 h-4 text-slate-400 transition-transform ${
-                                (isDispatcher && dispatcherDropdownOpen) ||
-                                (isFulfiller && fulfillerDropdownOpen)
+                              className={`w-4 h-4 text-slate-400 transition-transform ${(isDispatcher && dispatcherDropdownOpen) ||
+                                  (isFulfiller && fulfillerDropdownOpen)
                                   ? 'rotate-180'
                                   : ''
-                              }`}
+                                }`}
                             />
                           )}
                           <span className="text-xs font-mono text-slate-400">
@@ -889,11 +862,10 @@ export function PortalLoginView() {
                       {/* Dispatcher minimal department options */}
                       {isDispatcher && dispatcherDropdownOpen && (
                         <div
-                          className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${
-                            isLight
+                          className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${isLight
                               ? 'bg-slate-100/90 border-slate-200/80'
                               : 'bg-[#070d18]/90 border-white/10'
-                          }`}
+                            }`}
                         >
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {DISPATCHER_DEPARTMENTS.map((dept) => {
@@ -904,16 +876,15 @@ export function PortalLoginView() {
                                   type="button"
                                   key={dept.id}
                                   onClick={() => handleSelectDepartment(dept)}
-                                  className={`w-full text-left flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all text-xs sm:text-[13px] font-medium cursor-pointer portal-subdept-btn ${
-                                    isDeptActive
+                                  className={`w-full text-left flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all text-xs sm:text-[13px] font-medium cursor-pointer portal-subdept-btn ${isDeptActive
                                       ? 'portal-subdept-active ' +
-                                        (isLight
-                                          ? 'bg-amber-400/15 border-amber-400/80 text-slate-950'
-                                          : 'bg-amber-400/10 border-amber-400/70 text-white')
+                                      (isLight
+                                        ? 'bg-amber-400/15 border-amber-400/80 text-slate-950'
+                                        : 'bg-amber-400/10 border-amber-400/70 text-white')
                                       : isLight
-                                      ? 'bg-[#ffffff] border-slate-200/80 hover:border-slate-300 text-slate-700 shadow-2xs'
-                                      : 'bg-white/[0.04] border-white/5 hover:border-white/20 text-slate-300'
-                                  }`}
+                                        ? 'bg-[#ffffff] border-slate-200/80 hover:border-slate-300 text-slate-700 shadow-2xs'
+                                        : 'bg-white/[0.04] border-white/5 hover:border-white/20 text-slate-300'
+                                    }`}
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <div
@@ -936,11 +907,10 @@ export function PortalLoginView() {
                       {/* Task Fulfiller minimal department options */}
                       {isFulfiller && fulfillerDropdownOpen && (
                         <div
-                          className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${
-                            isLight
+                          className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${isLight
                               ? 'bg-slate-100/90 border-slate-200/80'
                               : 'bg-[#070d18]/90 border-white/10'
-                          }`}
+                            }`}
                         >
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {FULFILLER_DEPARTMENTS.map((fd) => {
@@ -951,16 +921,15 @@ export function PortalLoginView() {
                                   type="button"
                                   key={fd.key}
                                   onClick={() => handleSelectFulfillerDept(fd.key)}
-                                  className={`w-full text-left flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all text-xs sm:text-[13px] font-medium cursor-pointer portal-subdept-btn ${
-                                    isDeptActive
+                                  className={`w-full text-left flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all text-xs sm:text-[13px] font-medium cursor-pointer portal-subdept-btn ${isDeptActive
                                       ? 'portal-subdept-active ' +
-                                        (isLight
-                                          ? 'bg-amber-400/15 border-amber-400/80 text-slate-950'
-                                          : 'bg-amber-400/10 border-amber-400/70 text-white')
+                                      (isLight
+                                        ? 'bg-amber-400/15 border-amber-400/80 text-slate-950'
+                                        : 'bg-amber-400/10 border-amber-400/70 text-white')
                                       : isLight
-                                      ? 'bg-[#ffffff] border-slate-200/80 hover:border-slate-300 text-slate-700 shadow-2xs'
-                                      : 'bg-white/[0.04] border-white/5 hover:border-white/20 text-slate-300'
-                                  }`}
+                                        ? 'bg-[#ffffff] border-slate-200/80 hover:border-slate-300 text-slate-700 shadow-2xs'
+                                        : 'bg-white/[0.04] border-white/5 hover:border-white/20 text-slate-300'
+                                    }`}
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <div
