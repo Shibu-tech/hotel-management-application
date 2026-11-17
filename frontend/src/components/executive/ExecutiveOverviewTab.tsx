@@ -37,6 +37,7 @@ import {
   Users,
   Wallet,
   Wrench,
+  QrCode,
 } from 'lucide-react';
 import { useDemo } from '@/lib/store';
 import { useEmergencyBroadcast } from '@/lib/emergencyBroadcast';
@@ -702,8 +703,20 @@ export function ExecutiveOverviewTab({
           </div>
         </div>
 
-        {/* Timeframe selector */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl border border-white/10 bg-black/5 dark:bg-ink-950/80">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Quick My Hotel QR Code Launch Button */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab('my-hotel-qr')}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-600 dark:text-amber-400 transition-all cursor-pointer shadow-sm active:scale-95"
+            title="Inspect, download, and copy your assigned hotel's dynamic QR code"
+          >
+            <QrCode className="h-4 w-4 text-amber-500" />
+            <span>My Hotel QR Code</span>
+          </button>
+
+          {/* Timeframe selector */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl border border-white/10 bg-black/5 dark:bg-ink-950/80">
           {(['today', 'week', 'month', 'ytd'] as const).map((t) => (
             <button
               key={t}
@@ -718,6 +731,7 @@ export function ExecutiveOverviewTab({
               {t === 'today' ? 'Today' : t === 'week' ? '7 Days' : t === 'month' ? '30 Days' : 'YTD'}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
