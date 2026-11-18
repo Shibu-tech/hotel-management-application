@@ -27,13 +27,20 @@ export function ProtectedRoute({
   requiredHotelSlug,
 }: ProtectedRouteProps) {
   const router = useRouter();
-  const { user, loading, logout, changePassword } = useAuth();
+  const { user, loading, logout, changePassword, revalidateSession } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwSubmitting, setPwSubmitting] = useState(false);
+
+  // Re-verify active session with backend whenever entering a protected route
+  useEffect(() => {
+    if (!loading && user) {
+      void revalidateSession();
+    }
+  }, [loading, revalidateSession]);
 
   useEffect(() => {
     if (!loading && !user) {

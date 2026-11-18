@@ -35,6 +35,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<AuthSessionUser>;
   refreshSession: () => Promise<AuthSessionUser | null>;
+  revalidateSession: () => Promise<AuthSessionUser | null>;
   devQuickAccessEnabled: boolean;
   devQuickAccessEntries: DevQuickAccessEntry[];
   registerDevQuickAccessEntry: (entry: Omit<DevQuickAccessEntry, 'id' | 'createdAtLabel'>) => void;
@@ -42,6 +43,18 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const AUTH_BROADCAST_CHANNEL = 'hotel-auth-session';
+
+function broadcastAuthEvent(type: 'LOGIN' | 'LOGOUT') {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+  try {
+    const channel = new BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+    channel.postMessage({ type });
+    channel.close();
+  } catch {
+    // Ignore environments where BroadcastChannel is restricted
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthSessionUser | null>(null);
@@ -61,9 +74,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /**
+   * Silent session revalidation against backend /api/auth/me without flashing a full-screen spinner.
+   * Immediately clears user state if the HttpOnly cookie was cleared or revoked (e.g. logout/back navigation).
+   */
+  const revalidateSession = useCallback(async () => {
+    const current = await fetchCurrentSession();
+    setUser(current);
+    return current;
+  }, []);
+
   useEffect(() => {
     refreshSession();
   }, [refreshSession]);
+
+  // Re-verify session on browser bfcache restore (Back/Forward), tab focus, and cross-tab logout
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        void refreshSession();
+      }
+    };
+
+    const handlePopState = () => {
+      void revalidateSession();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void revalidateSession();
+      }
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('popstate', handlePopState);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        channel = new BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+        channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+          if (event.data?.type === 'LOGOUT') {
+            setUser(null);
+          } else if (event.data?.type === 'LOGIN') {
+            void revalidateSession();
+          }
+        };
+      } catch {
+        channel = null;
+      }
+    }
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('popstate', handlePopState);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (channel) {
+        channel.close();
+      }
+    };
+  }, [refreshSession, revalidateSession]);
 
   const registerDevQuickAccessEntry = useCallback(
     (entry: Omit<DevQuickAccessEntry, 'id' | 'createdAtLabel'>) => {
@@ -94,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string): Promise<AuthSessionUser> => {
       const sessionUser = await loginWithBackend(email, password);
       setUser(sessionUser);
+      broadcastAuthEvent('LOGIN');
       // In development mode, record successfully authenticated session accounts in memory only
       // so developers can switch back to Admin/GM/Staff during the same tab session without storing anything permanently.
       if (devEnabled) {
@@ -115,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await logoutFromBackend();
     setUser(null);
+    broadcastAuthEvent('LOGOUT');
   }, []);
 
   const changePassword = useCallback(
@@ -145,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       changePassword,
       refreshSession,
+      revalidateSession,
       devQuickAccessEnabled: devEnabled,
       devQuickAccessEntries: devEnabled ? devEntries : [],
       registerDevQuickAccessEntry,
@@ -157,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       changePassword,
       refreshSession,
+      revalidateSession,
       devEnabled,
       devEntries,
       registerDevQuickAccessEntry,

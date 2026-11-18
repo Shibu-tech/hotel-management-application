@@ -24,6 +24,19 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async headers() {
+    const noStoreHeaders = [
+      { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, private' },
+      { key: 'Pragma', value: 'no-cache' },
+      { key: 'Expires', value: '0' },
+    ];
+    return [
+      { source: '/login', headers: noStoreHeaders },
+      { source: '/admin/:path*', headers: noStoreHeaders },
+      { source: '/hotel/:path*', headers: noStoreHeaders },
+      { source: '/staff/:path*', headers: noStoreHeaders },
+    ];
+  },
   async rewrites() {
     if (!rawBackendTarget || !/^https?:\/\//i.test(rawBackendTarget)) {
       return [];

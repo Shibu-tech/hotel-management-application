@@ -217,6 +217,8 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
   const { state, setTheme, setPersona, setCurrentHotelSlug, setActiveDispatcherDept } = useDemo();
   const { t } = useI18n();
   const {
+    user: authenticatedUser,
+    loading: authLoading,
     login,
     devQuickAccessEnabled,
     devQuickAccessEntries,
@@ -442,7 +444,7 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
       }
 
       setToastMessage(`Authenticated as ${authUser.fullName}. Redirecting...`);
-      router.push(targetUrl);
+      router.replace(targetUrl);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setAuthError(err.message);
@@ -456,8 +458,37 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
     }
   };
 
+  // Prevent already-authenticated users from landing back on /login via browser Back/URL navigation.
+  // Users must explicitly Sign Out from their dashboard to end their session.
+  useEffect(() => {
+    if (authLoading || isSubmitting || !authenticatedUser) return;
+    let target = authenticatedUser.redirectUrl || '/';
+    if (authenticatedUser.role === 'SUPERVISOR' || authenticatedUser.role === 'FULFILLER') {
+      const derivedDept = deptSlugFromName(authenticatedUser.departmentName);
+      if (derivedDept && !target.includes('dept=')) {
+        target = `${target}?dept=${encodeURIComponent(derivedDept)}`;
+      }
+    }
+    router.replace(target);
+  }, [authLoading, isSubmitting, authenticatedUser, router]);
+
   const activeHotelName =
     availableHotels.find((h) => h.slug === selectedHotelSlug)?.name || selectedHotelSlug;
+
+  if (!authLoading && authenticatedUser && !isSubmitting) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center p-6 ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#080d1a] text-slate-100'}`}
+      >
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Lock className="w-7 h-7 text-amber-400" />
+          <p className="text-sm font-medium">
+            Active session detected ({authenticatedUser.email}). Redirecting to your dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
