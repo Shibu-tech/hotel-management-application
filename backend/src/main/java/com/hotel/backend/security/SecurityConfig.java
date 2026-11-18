@@ -28,12 +28,15 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final boolean cookieSecure;
+    private final String cookieSameSite;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
-            @Value("${app.cookie.secure:false}") boolean cookieSecure) {
+            @Value("${app.cookie.secure:false}") boolean cookieSecure,
+            @Value("${app.cookie.same-site:Lax}") String cookieSameSite) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.cookieSecure = cookieSecure;
+        this.cookieSameSite = cookieSameSite;
     }
 
     @Bean
@@ -47,7 +50,7 @@ public class SecurityConfig {
         csrfRepo.setCookiePath("/");
         csrfRepo.setCookieCustomizer(cookie -> cookie
                 .secure(cookieSecure)
-                .sameSite("Lax"));
+                .sameSite(cookieSameSite));
 
         CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
         csrfHandler.setCsrfRequestAttributeName(null);
