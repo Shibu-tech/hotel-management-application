@@ -38,8 +38,41 @@ export class ApiError extends Error {
   }
 }
 
+export function normalizeApiBaseUrl(raw?: string): string {
+  const trimmed = (raw || '').trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    return 'http://localhost:8080/api';
+  }
+  if (/\/api$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+}
+
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+  const configured = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+  const normalized = normalizeApiBaseUrl(configured);
+
+  // In HTTPS deployments (e.g., Vercel frontend + Render backend), proxy cross-origin
+  // requests through Next.js same-origin `/api/*` rewrites so HttpOnly auth cookies and
+  // Double-Submit XSRF-TOKEN cookies stay first-party across all browsers.
+  if (
+    configured &&
+    typeof window !== 'undefined' &&
+    window.location?.protocol === 'https:' &&
+    /^https?:\/\//i.test(normalized)
+  ) {
+    try {
+      const apiOrigin = new URL(normalized).origin;
+      if (apiOrigin !== window.location.origin) {
+        return '/api';
+      }
+    } catch {
+      // Fall back to normalized URL if parsing fails
+    }
+  }
+
+  return normalized;
 }
 
 /**

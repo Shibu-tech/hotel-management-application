@@ -253,3 +253,66 @@ describe('4. StaffRosterTab & Admin Dashboard Real API Wiring & Route Protection
     assert.match(legacyStaffSrc, /redirect\(['"]\/login['"]\)/);
   });
 });
+
+describe('5. Production API URL Normalization & Same-Origin Vercel Rewrite Proxy', () => {
+  const origApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const origWindow = globalThis.window;
+
+  afterEach(() => {
+    if (origApiUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_API_URL;
+    } else {
+      process.env.NEXT_PUBLIC_API_URL = origApiUrl;
+    }
+    if (origWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = origWindow;
+    }
+  });
+
+  it('normalizes NEXT_PUBLIC_API_URL to always include /api without duplication', async () => {
+    const { normalizeApiBaseUrl } = await import('../src/lib/authApi.ts');
+    assert.equal(
+      normalizeApiBaseUrl('https://hotel-management-application-4v49.onrender.com'),
+      'https://hotel-management-application-4v49.onrender.com/api',
+    );
+    assert.equal(
+      normalizeApiBaseUrl('https://hotel-management-application-4v49.onrender.com/'),
+      'https://hotel-management-application-4v49.onrender.com/api',
+    );
+    assert.equal(
+      normalizeApiBaseUrl('https://hotel-management-application-4v49.onrender.com/api/'),
+      'https://hotel-management-application-4v49.onrender.com/api',
+    );
+    assert.equal(normalizeApiBaseUrl('/api'), '/api');
+    assert.equal(normalizeApiBaseUrl(''), 'http://localhost:8080/api');
+  });
+
+  it('uses same-origin /api proxy on HTTPS cross-origin deployments (Vercel -> Render) and normalized direct URL on localhost', async () => {
+    const { getApiBaseUrl } = await import('../src/lib/authApi.ts');
+
+    process.env.NEXT_PUBLIC_API_URL = 'https://hotel-management-application-4v49.onrender.com';
+    globalThis.window = {
+      location: {
+        protocol: 'https:',
+        origin: 'https://hotel-management-application-seven.vercel.app',
+      },
+    };
+    assert.equal(getApiBaseUrl(), '/api');
+
+    globalThis.window = {
+      location: {
+        protocol: 'http:',
+        origin: 'http://localhost:3000',
+      },
+    };
+    assert.equal(getApiBaseUrl(), 'https://hotel-management-application-4v49.onrender.com/api');
+  });
+
+  it('next.config.mjs defines /api/:path* rewrite for production cookie & CSRF compatibility', () => {
+    const nextConfigSrc = fs.readFileSync(path.resolve(__dirname, '../next.config.mjs'), 'utf8');
+    assert.match(nextConfigSrc, /async rewrites\(\)/);
+    assert.match(nextConfigSrc, /source:\s*['"]\/api\/:path\*['"]/);
+  });
+});

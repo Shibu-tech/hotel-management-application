@@ -12,6 +12,7 @@ import {
   Home,
 } from 'lucide-react';
 import { PortalLoginView, LockedHotelInfo } from '@/components/login/PortalLoginView';
+import { getApiBaseUrl } from '@/lib/authApi';
 
 export default function HotelGuestScanPage() {
   const params = useParams();
@@ -22,10 +23,6 @@ export default function HotelGuestScanPage() {
   const [errorType, setErrorType] = useState<'invalid_id' | 'not_found' | 'inactive' | 'network' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [hotel, setHotel] = useState<LockedHotelInfo | null>(null);
-
-  const getApiUrl = () => {
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
-  };
 
   useEffect(() => {
     if (!rawHotelId) return;
@@ -46,7 +43,7 @@ export default function HotelGuestScanPage() {
       setErrorType(null);
 
       try {
-        const res = await fetch(`${getApiUrl()}/hotels/${parsedId}/public`, {
+        const res = await fetch(`${getApiBaseUrl()}/hotels/${parsedId}/public`, {
           headers: { Accept: 'application/json' },
         });
 
