@@ -78,9 +78,10 @@ describe('2. Login Page Security, Autofill & No Offline Auth Bypass', () => {
     assert.doesNotMatch(autofillMatch[0], /router\.push/);
   });
 
-  it('redirects strictly using backend-supplied redirectUrl and fails closed when backend is unreachable', () => {
+  it('redirects strictly using backend-supplied redirectUrl with router.replace and fails closed when backend is unreachable', () => {
     assert.match(loginSrc, /authUser\.redirectUrl/);
-    assert.match(loginSrc, /router\.push\(targetUrl\)/);
+    assert.match(loginSrc, /router\.replace\(targetUrl\)/);
+    assert.doesNotMatch(loginSrc, /router\.push\(targetUrl\)/);
     assert.match(loginSrc, /Authentication server is unreachable/);
   });
 });
@@ -308,5 +309,46 @@ describe('5. Production API URL Normalization & Same-Origin Vercel Rewrite Proxy
     const nextConfigSrc = fs.readFileSync(path.resolve(__dirname, '../next.config.mjs'), 'utf8');
     assert.match(nextConfigSrc, /async rewrites\(\)/);
     assert.match(nextConfigSrc, /source:\s*['"]\/api\/:path\*['"]/);
+  });
+});
+
+describe('6. Browser Back/Forward Navigation, Logout Revocation & bfcache Hardening', () => {
+  it('PortalLoginView blocks already-authenticated users from landing on /login and replaces history on login', () => {
+    const loginSrc = fs.readFileSync(
+      path.join(FRONTEND_SRC, 'components/login/PortalLoginView.tsx'),
+      'utf8',
+    );
+    assert.match(loginSrc, /user:\s*authenticatedUser/);
+    assert.match(loginSrc, /if\s*\(!authLoading\s*&&\s*authenticatedUser\s*&&\s*!isSubmitting\)/);
+    assert.match(loginSrc, /router\.replace\(target\)/);
+    assert.match(loginSrc, /router\.replace\(targetUrl\)/);
+  });
+
+  it('FulfillerProfileTab revokes backend session via await logout() and uses router.replace(/login)', () => {
+    const fulfillerSrc = fs.readFileSync(
+      path.join(FRONTEND_SRC, 'components/staff/fulfiller/FulfillerProfileTab.tsx'),
+      'utf8',
+    );
+    assert.match(fulfillerSrc, /const\s*\{\s*logout\s*\}\s*=\s*useAuth\(\)/);
+    assert.match(fulfillerSrc, /await logout\(\)/);
+    assert.match(fulfillerSrc, /router\.replace\(['"]\/login['"]\)/);
+    assert.doesNotMatch(fulfillerSrc, /router\.push\(['"]\/login['"]\)/);
+  });
+
+  it('AuthProvider revalidates sessions on bfcache pageshow/popstate and syncs logout across tabs', () => {
+    const authCtxSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/authContext.tsx'), 'utf8');
+    assert.match(authCtxSrc, /window\.addEventListener\(['"]pageshow['"]/);
+    assert.match(authCtxSrc, /event\.persisted/);
+    assert.match(authCtxSrc, /window\.addEventListener\(['"]popstate['"]/);
+    assert.match(authCtxSrc, /BroadcastChannel/);
+    assert.match(authCtxSrc, /broadcastAuthEvent\(['"]LOGOUT['"]\)/);
+  });
+
+  it('next.config.mjs sends Cache-Control: no-store headers on protected routes and /login', () => {
+    const nextConfigSrc = fs.readFileSync(path.resolve(__dirname, '../next.config.mjs'), 'utf8');
+    assert.match(nextConfigSrc, /async headers\(\)/);
+    assert.match(nextConfigSrc, /no-store, no-cache, must-revalidate, private/);
+    assert.match(nextConfigSrc, /source:\s*['"]\/admin\/:path\*['"]/);
+    assert.match(nextConfigSrc, /source:\s*['"]\/hotel\/:path\*['"]/);
   });
 });

@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { useDemo } from '@/lib/store';
+import { useAuth } from '@/lib/authContext';
 import { FULFILLER_PROFILES, type FulfillerProfile } from './fulfillerProfiles';
 import { cn } from '@/lib/utils';
 import { playChime } from './chime';
@@ -57,6 +58,7 @@ interface FulfillerProfileTabProps {
 export function FulfillerProfileTab({ profile }: FulfillerProfileTabProps) {
   const activeProfile = profile || FULFILLER_PROFILES.housekeeping;
   const router = useRouter();
+  const { logout } = useAuth();
   const {
     state,
     setTheme,
@@ -87,9 +89,10 @@ export function FulfillerProfileTab({ profile }: FulfillerProfileTabProps) {
     setEmergencyNotes('');
   }
 
-  function handleLogoutConfirm() {
+  async function handleLogoutConfirm() {
     setLogoutModalOpen(false);
-    router.push('/login');
+    await logout();
+    router.replace('/login');
   }
 
   return (
