@@ -76,14 +76,12 @@ export function getApiBaseUrl(): string {
 }
 
 /**
- * Strictly development-only feature flag.
- * Guaranteed false in production builds (NODE_ENV === 'production').
- * Enabled by default in local development unless NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false'.
+ * Testing/demo Quick Access autofill panel flag.
+ * Enabled by default while testing (both local and Vercel deployments).
+ * Set NEXT_PUBLIC_DEV_QUICK_ACCESS=false before live hotel rollout to hide it completely.
+ * NOTE: Quick Access ONLY autofills email & password inputs — all logins still go through full backend auth.
  */
 export function isDevQuickAccessEnabled(): boolean {
-  if (process.env.NODE_ENV === 'production') {
-    return false;
-  }
   return process.env.NEXT_PUBLIC_DEV_QUICK_ACCESS !== 'false';
 }
 

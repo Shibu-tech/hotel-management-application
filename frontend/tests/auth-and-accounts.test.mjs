@@ -11,7 +11,7 @@ const FRONTEND_SRC = path.resolve(__dirname, '../src');
 // Mirror of core authApi.ts runtime behavior & direct source contract verification
 // plus live fetch/cookie/CSRF unit tests against authApi.ts & hotelEmployeesApi.ts
 
-describe('1. Development Quick Access Feature Flag & Production Exclusion', () => {
+describe('1. Quick Access Feature Flag & Live Rollout Kill-Switch', () => {
   const origNodeEnv = process.env.NODE_ENV;
   const origFlag = process.env.NEXT_PUBLIC_DEV_QUICK_ACCESS;
 
@@ -24,28 +24,22 @@ describe('1. Development Quick Access Feature Flag & Production Exclusion', () =
     }
   });
 
-  function evaluateDevQuickAccessFlag(nodeEnv, flagValue) {
-    if (nodeEnv === 'production') {
-      return false;
-    }
+  function evaluateDevQuickAccessFlag(flagValue) {
     return flagValue !== 'false';
   }
 
-  it('is strictly disabled in production even if NEXT_PUBLIC_DEV_QUICK_ACCESS is true', () => {
-    assert.equal(evaluateDevQuickAccessFlag('production', 'true'), false);
-    assert.equal(evaluateDevQuickAccessFlag('production', 'false'), false);
-    assert.equal(evaluateDevQuickAccessFlag('production', undefined), false);
+  it('is disabled when NEXT_PUBLIC_DEV_QUICK_ACCESS=false (live hotel rollout switch)', () => {
+    assert.equal(evaluateDevQuickAccessFlag('false'), false);
   });
 
-  it('is enabled in development unless explicitly disabled via NEXT_PUBLIC_DEV_QUICK_ACCESS=false', () => {
-    assert.equal(evaluateDevQuickAccessFlag('development', 'true'), true);
-    assert.equal(evaluateDevQuickAccessFlag('development', undefined), true);
-    assert.equal(evaluateDevQuickAccessFlag('development', 'false'), false);
+  it('is enabled by default for local & staging/demo testing unless disabled via NEXT_PUBLIC_DEV_QUICK_ACCESS=false', () => {
+    assert.equal(evaluateDevQuickAccessFlag('true'), true);
+    assert.equal(evaluateDevQuickAccessFlag(undefined), true);
   });
 
-  it('authApi.ts enforces NODE_ENV === production guard and never stores tokens in localStorage', () => {
+  it('authApi.ts checks NEXT_PUBLIC_DEV_QUICK_ACCESS kill-switch and never stores tokens in localStorage', () => {
     const authApiSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/authApi.ts'), 'utf8');
-    assert.match(authApiSrc, /if\s*\(\s*process\.env\.NODE_ENV\s*===\s*['"]production['"]\s*\)\s*\{\s*return false;/);
+    assert.match(authApiSrc, /return process\.env\.NEXT_PUBLIC_DEV_QUICK_ACCESS !== ['"]false['"];/);
     assert.match(authApiSrc, /credentials:\s*['"]include['"]/);
     assert.match(authApiSrc, /X-XSRF-TOKEN/);
     assert.doesNotMatch(authApiSrc, /localStorage\.(getItem|setItem|removeItem|clear)/);
@@ -66,11 +60,11 @@ describe('2. Login Page Security, Autofill & No Offline Auth Bypass', () => {
     'utf8',
   );
 
-  it('removes offline auth bypass, substring role inference, and localStorage token storage, and strips baseline entries in production', () => {
+  it('removes offline auth bypass, substring role inference, and localStorage token storage, and strips baseline entries when NEXT_PUBLIC_DEV_QUICK_ACCESS=false', () => {
     assert.doesNotMatch(loginSrc, /handleOfflineFallback/);
     assert.doesNotMatch(loginSrc, /localStorage\.setItem\(['"]authToken/);
     assert.doesNotMatch(loginSrc, /cleanEmail\.includes\(['"]admin['"]\)/);
-    assert.match(loginSrc, /process\.env\.NODE_ENV === 'production'\s*\?\s*\[\]/);
+    assert.match(loginSrc, /process\.env\.NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false'\s*\?\s*\[\]/);
   });
 
   it('DEV QUICK ACCESS autofills email & password ONLY and never auto-submits', () => {
