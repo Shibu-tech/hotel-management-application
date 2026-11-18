@@ -79,11 +79,12 @@ const DEFAULT_PUBLIC_HOTELS: HotelOption[] = [
 ];
 
 /**
- * Development-stage baseline autofill entries (rendered ONLY when NODE_ENV !== 'production').
+ * Baseline autofill entries for testing/demo Quick Access panel.
+ * Stripped when NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false' (for live hotel rollout).
  * Strictly populates email & password inputs — NEVER bypasses backend BCrypt/JWT authentication.
  */
 const DEV_BASELINE_ACCOUNTS: QuickFillItem[] =
-  process.env.NODE_ENV === 'production'
+  process.env.NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false'
     ? []
     : [
       {
