@@ -4,6 +4,7 @@ import com.hotel.backend.dto.*;
 import com.hotel.backend.service.HotelRoomService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,12 +18,14 @@ public class HotelRoomController {
     }
 
     @GetMapping("/rooms")
+    @PreAuthorize("@tenantAuth.canReadRooms(authentication, #slug)")
     public ResponseEntity<HotelInventoryResponse> getInventory(@PathVariable String slug) {
         HotelInventoryResponse response = hotelRoomService.getInventory(slug);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/rooms")
+    @PreAuthorize("@tenantAuth.canManageRooms(authentication, #slug)")
     public ResponseEntity<RoomDto> addRoom(
             @PathVariable String slug,
             @RequestBody CreateRoomRequest request) {
@@ -31,6 +34,7 @@ public class HotelRoomController {
     }
 
     @DeleteMapping("/rooms/{roomNo}")
+    @PreAuthorize("@tenantAuth.canManageRooms(authentication, #slug)")
     public ResponseEntity<Void> deleteRoom(
             @PathVariable String slug,
             @PathVariable String roomNo) {
@@ -39,6 +43,7 @@ public class HotelRoomController {
     }
 
     @PostMapping("/floors")
+    @PreAuthorize("@tenantAuth.canManageRooms(authentication, #slug)")
     public ResponseEntity<FloorDto> addFloor(
             @PathVariable String slug,
             @RequestBody CreateFloorRequest request) {
@@ -47,6 +52,7 @@ public class HotelRoomController {
     }
 
     @DeleteMapping("/floors/{floor}")
+    @PreAuthorize("@tenantAuth.canManageRooms(authentication, #slug)")
     public ResponseEntity<Void> deleteFloor(
             @PathVariable String slug,
             @PathVariable Integer floor) {

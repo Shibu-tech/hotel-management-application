@@ -1,5 +1,6 @@
 package com.hotel.backend.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -10,26 +11,28 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 
+    private final List<String> allowedOrigins;
+
+    public CorsConfig(
+            @Value("${app.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000}") String originsCsv) {
+        this.allowedOrigins = Arrays.stream(originsCsv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty() && !"*".equals(s))
+                .collect(Collectors.toList());
+    }
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOriginPatterns(
-                        "http://localhost:[*]",
-                        "http://127.0.0.1:[*]",
-                        "http://localhost:3000",
-                        "http://127.0.0.1:3000",
-                        "http://localhost:5173",
-                        "http://127.0.0.1:5173",
-                        "http://localhost:3001",
-                        "*"
-                )
+                .allowedOrigins(allowedOrigins.toArray(new String[0]))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("*")
-                .exposedHeaders("Authorization", "Content-Disposition", "Content-Type", "Accept")
+                .allowedHeaders("Content-Type", "Authorization", "Accept", "X-XSRF-TOKEN", "X-Requested-With")
+                .exposedHeaders("Content-Disposition", "Content-Type", "Accept")
                 .allowCredentials(true)
                 .maxAge(3600);
     }
@@ -37,19 +40,10 @@ public class CorsConfig implements WebMvcConfigurer {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(
-                "http://localhost:[*]",
-                "http://127.0.0.1:[*]",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:3001",
-                "*"
-        ));
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Disposition", "Content-Type", "Accept"));
+        configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "Accept", "X-XSRF-TOKEN", "X-Requested-With"));
+        configuration.setExposedHeaders(Arrays.asList("Content-Disposition", "Content-Type", "Accept"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { DemoProvider } from '@/lib/store';
+import { AuthProvider } from '@/lib/authContext';
 import { I18nProvider } from '@/lib/i18n';
 import { GoogleTranslate } from '@/components/shared/GoogleTranslate';
 import './globals.css';
@@ -34,10 +35,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <I18nProvider>
-          <DemoProvider>
-            {children}
-            <GoogleTranslate />
-          </DemoProvider>
+          <AuthProvider>
+            <DemoProvider>
+              {children}
+              <GoogleTranslate />
+            </DemoProvider>
+          </AuthProvider>
         </I18nProvider>
       </body>
     </html>

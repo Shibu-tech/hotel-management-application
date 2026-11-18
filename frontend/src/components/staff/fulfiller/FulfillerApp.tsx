@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { useDemo } from '@/lib/store';
+import { useAuth } from '@/lib/authContext';
 import { useI18n } from '@/lib/i18n';
 import { LanguageSelector } from '@/components/shared/LanguageSelector';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ type FulfillerTab = 'tasks' | 'notifications' | 'policies' | 'performance' | 'pr
 
 function FulfillerAppContent() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const {
     state,
     setPersona,
@@ -77,13 +79,22 @@ function FulfillerAppContent() {
   };
 
   const [activeDeptKey, setActiveDeptKey] = useState<FulfillerDeptKey>(getInitialDept);
+  const hasLockedDbDept = Boolean(user?.departmentName);
 
   useEffect(() => {
+    const dbDept = (user?.departmentName || '').toLowerCase();
+    if (dbDept) {
+      if (dbDept.includes('well') || dbDept.includes('spa')) setActiveDeptKey('wellness');
+      else if (dbDept.includes('maint') || dbDept.includes('eng')) setActiveDeptKey('maintenance');
+      else if (dbDept.includes('fnb') || dbDept.includes('food') || dbDept.includes('bev')) setActiveDeptKey('fnb');
+      else if (dbDept.includes('house')) setActiveDeptKey('housekeeping');
+      return;
+    }
     if (rawParam.includes('well') || rawParam.includes('spa')) setActiveDeptKey('wellness');
     else if (rawParam.includes('maint') || rawParam.includes('eng')) setActiveDeptKey('maintenance');
     else if (rawParam.includes('fnb') || rawParam.includes('food') || rawParam.includes('dining')) setActiveDeptKey('fnb');
     else if (rawParam.includes('house')) setActiveDeptKey('housekeeping');
-  }, [rawParam]);
+  }, [rawParam, user?.departmentName]);
 
   const profile: FulfillerProfile = FULFILLER_PROFILES[activeDeptKey] || FULFILLER_PROFILES.housekeeping;
 
@@ -617,14 +628,42 @@ function FulfillerAppContent() {
                     </span>
                   </button>
                 </div>
-                <p
-                  className={cn(
-                    'text-[10px] sm:text-xs truncate font-medium mt-0.5',
-                    isLight ? 'text-[#686252]' : 'text-[#d9cebe]',
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {hasLockedDbDept ? (
+                    <p
+                      className={cn(
+                        'text-[10px] sm:text-xs truncate font-medium',
+                        isLight ? 'text-[#686252]' : 'text-[#d9cebe]',
+                      )}
+                    >
+                      {user?.departmentName} · {profile.zone}
+                    </p>
+                  ) : (
+                    <select
+                      aria-label="Select fulfiller department"
+                      value={activeDeptKey}
+                      onChange={(e) => {
+                        const nextKey = e.target.value as FulfillerDeptKey;
+                        setActiveDeptKey(nextKey);
+                        if (nextKey === 'wellness') setActiveDispatcherDept('Wellness');
+                        else if (nextKey === 'maintenance') setActiveDispatcherDept('Maintenance & Engineering');
+                        else if (nextKey === 'fnb') setActiveDispatcherDept('Food & Beverages');
+                        else setActiveDispatcherDept('Housekeeping');
+                      }}
+                      className={cn(
+                        'rounded-lg border px-2 py-0.5 text-[10px] sm:text-xs font-semibold focus:outline-none cursor-pointer',
+                        isLight
+                          ? 'border-[#e7e2d7] bg-[#ffffff] text-[#353229]'
+                          : 'border-[rgba(165,130,95,0.3)] bg-[#1f1f24] text-[#dfc187]',
+                      )}
+                    >
+                      <option value="housekeeping">Housekeeping</option>
+                      <option value="wellness">Spa &amp; Wellness</option>
+                      <option value="maintenance">Maintenance &amp; Engineering</option>
+                      <option value="fnb">Food &amp; Beverages</option>
+                    </select>
                   )}
-                >
-                  {profile.departmentName} · {profile.zone}
-                </p>
+                </div>
               </div>
             </div>
 

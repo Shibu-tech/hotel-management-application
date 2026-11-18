@@ -10,6 +10,8 @@ import { Panel } from '@/components/ui/Panel';
 import { FeedList } from '@/components/shared/FeedList';
 import { StatCard } from '@/components/shared/StatCard';
 import { TopBar } from '@/components/shared/TopBar';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import type { BackendRole } from '@/lib/authApi';
 import { FrontDeskConsole } from '@/components/frontdesk/FrontDeskConsole';
 import { DispatcherSupervisorConsole } from '@/components/dispatcher-supervisor/DispatcherSupervisorConsole';
 import { DispatcherConsole } from '@/components/dispatcher/DispatcherConsole';
@@ -33,7 +35,35 @@ const BANNER_TONE: Record<Tone, string> = {
   accent: 'border-white/10 bg-white/5 text-mist-200',
 };
 
+function allowedBackendRolesFor(roleId: RoleId): BackendRole[] {
+  if (roleId === 'general_manager' || roleId === 'executive_viewer') {
+    return ['GENERAL_MANAGER'];
+  }
+  if (
+    roleId === 'department_dispatcher_supervisor' ||
+    roleId === 'department_dispatcher' ||
+    roleId === 'department_supervisor'
+  ) {
+    return ['SUPERVISOR'];
+  }
+  if (roleId === 'front_desk_coordinator') {
+    return ['FRONT_DESK'];
+  }
+  if (roleId === 'task_fulfiller') {
+    return ['FULFILLER'];
+  }
+  return ['GENERAL_MANAGER'];
+}
+
 export function RoleDashboard({ roleId, hotelSlug }: { roleId: RoleId; hotelSlug?: string }) {
+  return (
+    <ProtectedRoute allowedRoles={allowedBackendRolesFor(roleId)} requiredHotelSlug={hotelSlug}>
+      <RoleDashboardInner roleId={roleId} hotelSlug={hotelSlug} />
+    </ProtectedRoute>
+  );
+}
+
+function RoleDashboardInner({ roleId, hotelSlug }: { roleId: RoleId; hotelSlug?: string }) {
   const role = roleById[roleId];
   const cfg = dashboards[roleId];
   const { state, setPersona, setCurrentHotelSlug } = useDemo();

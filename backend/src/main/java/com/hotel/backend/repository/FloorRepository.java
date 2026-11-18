@@ -20,4 +20,6 @@ public interface FloorRepository extends JpaRepository<Floor, Long> {
     long countByHotel(Hotel hotel);
 
     void deleteByHotelAndFloorNumber(Hotel hotel, Integer floorNumber);
+
+    void deleteByHotelId(Long hotelId);
 }

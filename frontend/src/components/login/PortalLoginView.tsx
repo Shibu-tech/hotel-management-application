@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import './portal-login.css';
@@ -14,188 +14,34 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  Smartphone,
-  ClipboardCheck,
+  Globe,
+  ShieldAlert,
+  AlertCircle,
+  CheckCircle2,
+  Check,
+  Crown,
   Radio,
   BellRing,
-  Crown,
-  Globe,
-  Info,
+  ClipboardCheck,
+  FlaskConical,
+  Trash2,
   Sparkles,
   HeartPulse,
   Wrench,
   UtensilsCrossed,
-  ChevronDown,
-  Check,
-  ShieldAlert,
-  AlertCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { useDemo } from '@/lib/store';
+import type { DispatcherDepartment } from '@/types/demo';
 import { useI18n } from '@/lib/i18n';
 import { LanguageSelector } from '@/components/shared/LanguageSelector';
 import {
-  FULFILLER_PROFILES,
-  type FulfillerDeptKey,
-} from '@/components/staff/fulfiller/fulfillerProfiles';
-import type { RoleId, DispatcherDepartment } from '@/types/demo';
-
-export interface PresetRole {
-  id: string;
-  num: string;
-  name: string;
-  email: string;
-  pass: string;
-  icon: LucideIcon;
-  color: string;
-  path: string;
-  personaId?: RoleId;
-}
-
-export interface HotelOption {
-  id: number;
-  name: string;
-  slug: string;
-}
-
-const DEFAULT_PUBLIC_HOTELS: HotelOption[] = [
-  { id: 1, name: 'The Grand ADP (Flagship)', slug: 'grand-adp' },
-  { id: 2, name: 'The Grand Palace Mumbai', slug: 'palace-mumbai' },
-];
-
-/**
- * Requirement 3:
- * The 6 primary roles for the Quick Role Fill panel:
- * Admin, General Manager, Supervisor, Front Desk, Fulfiller, and Guest Portal.
- * Clicking any role card only pre-fills email and password to assist testing.
- */
-const PRESET_ROLES: PresetRole[] = [
-  {
-    id: 'admin',
-    num: '00',
-    name: 'Admin',
-    email: 'admin@thegrandadp.com',
-    pass: 'admin123',
-    icon: ShieldAlert,
-    color: 'from-purple-500 to-indigo-600',
-    path: '/admin/dashboard',
-  },
-  {
-    id: 'gm',
-    num: '01',
-    name: 'General Manager',
-    email: 'gm@thegrandadp.com',
-    pass: 'gm123',
-    icon: Crown,
-    color: 'from-amber-500 to-orange-600',
-    path: '/hotel/grand-adp/gm',
-    personaId: 'general_manager',
-  },
-  {
-    id: 'dispatcher',
-    num: '02',
-    name: 'Supervisor',
-    email: 'dispatcher@thegrandadp.com',
-    pass: 'dispatch123',
-    icon: Radio,
-    color: 'from-sky-500 to-blue-600',
-    path: '/hotel/grand-adp/supervisor',
-    personaId: 'department_dispatcher_supervisor',
-  },
-  {
-    id: 'frontdesk',
-    num: '03',
-    name: 'Front Desk',
-    email: 'frontdesk@thegrandadp.com',
-    pass: 'desk123',
-    icon: BellRing,
-    color: 'from-pink-500 to-rose-600',
-    path: '/hotel/grand-adp/front-desk',
-    personaId: 'front_desk_coordinator',
-  },
-  {
-    id: 'fulfiller',
-    num: '04',
-    name: 'Fulfiller',
-    email: 'fulfiller@thegrandadp.com',
-    pass: 'task123',
-    icon: ClipboardCheck,
-    color: 'from-emerald-500 to-teal-600',
-    path: '/hotel/grand-adp/fulfiller',
-    personaId: 'task_fulfiller',
-  },
-  {
-    id: 'guest',
-    num: '05',
-    name: 'Guest Portal',
-    email: 'guest@thegrandadp.com',
-    pass: 'guest123',
-    icon: Smartphone,
-    color: 'from-cyan-500 to-teal-500',
-    path: '/hotel/grand-adp/guest',
-  },
-];
-
-export interface DispatcherDeptOption {
-  id: DispatcherDepartment;
-  slug: string;
-  name: string;
-  email: string;
-  pass: string;
-  description: string;
-  icon: LucideIcon;
-  color: string;
-}
-
-export const DISPATCHER_DEPARTMENTS: DispatcherDeptOption[] = [
-  {
-    id: 'Housekeeping',
-    slug: 'housekeeping',
-    name: 'Housekeeping',
-    email: 'dispatcher.housekeeping@thegrandadp.com',
-    pass: 'dispatch123',
-    description: 'Turnover, deep clean, linen logistics & quality inspections',
-    icon: Sparkles,
-    color: 'from-emerald-500 to-teal-600',
-  },
-  {
-    id: 'Wellness',
-    slug: 'wellness',
-    name: 'Wellness',
-    email: 'dispatcher.wellness@thegrandadp.com',
-    pass: 'dispatch123',
-    description: 'Spa treatments, hydrotherapy pools & wellness sessions',
-    icon: HeartPulse,
-    color: 'from-teal-500 to-cyan-600',
-  },
-  {
-    id: 'Maintenance & Engineering',
-    slug: 'maintenance',
-    name: 'Maintenance & Engineering',
-    email: 'dispatcher.engineering@thegrandadp.com',
-    pass: 'dispatch123',
-    description: 'HVAC climate, plumbing, electrical & asset work orders',
-    icon: Wrench,
-    color: 'from-amber-500 to-orange-600',
-  },
-  {
-    id: 'Food & Beverages',
-    slug: 'fnb',
-    name: 'Food & Beverages',
-    email: 'dispatcher.fnb@thegrandadp.com',
-    pass: 'dispatch123',
-    description: 'In-room dining, bar services, pantry & meal delivery',
-    icon: UtensilsCrossed,
-    color: 'from-purple-500 to-pink-600',
-  },
-];
-
-const FULFILLER_DEPARTMENTS: { key: FulfillerDeptKey; name: string }[] = [
-  { key: 'housekeeping', name: 'Housekeeping' },
-  { key: 'wellness', name: 'Spa & Wellness' },
-  { key: 'maintenance', name: 'Maintenance & Engineering' },
-  { key: 'fnb', name: 'Food & Beverages' },
-];
+  ApiError,
+  getApiBaseUrl,
+  requestForgotPassword,
+  type BackendRole,
+} from '@/lib/authApi';
+import { useAuth, type DevQuickAccessEntry } from '@/lib/authContext';
 
 export interface LockedHotelInfo {
   id: number;
@@ -208,45 +54,203 @@ export interface PortalLoginViewProps {
   lockedHotel?: LockedHotelInfo;
 }
 
+export interface HotelOption {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+interface QuickFillItem {
+  id: string;
+  name: string;
+  role: BackendRole;
+  email: string;
+  pass: string;
+  hotelSlug: string | null; // null = global platform ADMIN
+  departmentName?: string | null;
+  icon: LucideIcon;
+  accent: string;
+  isSessionCreated?: boolean;
+}
+
+const DEFAULT_PUBLIC_HOTELS: HotelOption[] = [
+  { id: 1, name: 'The Grand ADP', slug: 'grand-adp' },
+  { id: 2, name: 'The Grand Palace Mumbai', slug: 'palace-mumbai' },
+];
+
+/**
+ * Development-stage baseline autofill entries (rendered ONLY when NODE_ENV !== 'production').
+ * Strictly populates email & password inputs — NEVER bypasses backend BCrypt/JWT authentication.
+ */
+const DEV_BASELINE_ACCOUNTS: QuickFillItem[] =
+  process.env.NODE_ENV === 'production'
+    ? []
+    : [
+        {
+          id: 'dev-admin',
+          name: 'Admin',
+          role: 'ADMIN',
+          email: 'admin@thegrandadp.com',
+          pass: 'admin123',
+          hotelSlug: null,
+          icon: ShieldAlert,
+          accent: 'from-purple-500 to-indigo-600',
+        },
+        {
+          id: 'dev-grand-adp-gm',
+          name: 'General Manager',
+          role: 'GENERAL_MANAGER',
+          email: 'gm@thegrandadp.com',
+          pass: 'gm123',
+          hotelSlug: 'grand-adp',
+          icon: Crown,
+          accent: 'from-amber-500 to-orange-600',
+        },
+        {
+          id: 'dev-grand-adp-sup',
+          name: 'Supervisor',
+          role: 'SUPERVISOR',
+          email: 'dispatcher@thegrandadp.com',
+          pass: 'dispatch123',
+          hotelSlug: 'grand-adp',
+          icon: Radio,
+          accent: 'from-sky-500 to-blue-600',
+        },
+        {
+          id: 'dev-grand-adp-fd',
+          name: 'Front Desk',
+          role: 'FRONT_DESK',
+          email: 'frontdesk@thegrandadp.com',
+          pass: 'desk123',
+          hotelSlug: 'grand-adp',
+          icon: BellRing,
+          accent: 'from-pink-500 to-rose-600',
+        },
+        {
+          id: 'dev-grand-adp-ful',
+          name: 'Fulfiller',
+          role: 'FULFILLER',
+          email: 'fulfiller@thegrandadp.com',
+          pass: 'task123',
+          hotelSlug: 'grand-adp',
+          icon: ClipboardCheck,
+          accent: 'from-emerald-500 to-teal-600',
+        },
+        {
+          id: 'dev-mumbai-gm',
+          name: 'General Manager',
+          role: 'GENERAL_MANAGER',
+          email: 'gm.mumbai@thegrandadp.com',
+          pass: 'gm123',
+          hotelSlug: 'palace-mumbai',
+          icon: Crown,
+          accent: 'from-amber-500 to-orange-600',
+        },
+      ];
+
+function roleIcon(role: BackendRole): LucideIcon {
+  switch (role) {
+    case 'ADMIN':
+      return ShieldAlert;
+    case 'GENERAL_MANAGER':
+      return Crown;
+    case 'SUPERVISOR':
+      return Radio;
+    case 'FRONT_DESK':
+      return BellRing;
+    case 'FULFILLER':
+    default:
+      return ClipboardCheck;
+  }
+}
+
+function roleAccent(role: BackendRole): string {
+  switch (role) {
+    case 'ADMIN':
+      return 'from-purple-500 to-indigo-600';
+    case 'GENERAL_MANAGER':
+      return 'from-amber-500 to-orange-600';
+    case 'SUPERVISOR':
+      return 'from-sky-500 to-blue-600';
+    case 'FRONT_DESK':
+      return 'from-pink-500 to-rose-600';
+    case 'FULFILLER':
+    default:
+      return 'from-emerald-500 to-teal-600';
+  }
+}
+
+const ROLE_LABELS: Record<BackendRole, string> = {
+  ADMIN: 'Admin',
+  GENERAL_MANAGER: 'General Manager',
+  SUPERVISOR: 'Supervisor',
+  FRONT_DESK: 'Front Desk',
+  FULFILLER: 'Fulfiller',
+  GUEST: 'Guest',
+};
+
+const QUICK_DEPT_OPTIONS: Array<{
+  slug: 'housekeeping' | 'wellness' | 'maintenance' | 'fnb';
+  label: string;
+  dispatcherDept: DispatcherDepartment;
+  icon: LucideIcon;
+}> = [
+  { slug: 'housekeeping', label: 'Housekeeping', dispatcherDept: 'Housekeeping', icon: Sparkles },
+  { slug: 'wellness', label: 'Spa & Wellness', dispatcherDept: 'Wellness', icon: HeartPulse },
+  { slug: 'maintenance', label: 'Maintenance', dispatcherDept: 'Maintenance & Engineering', icon: Wrench },
+  { slug: 'fnb', label: 'Food & Beverages', dispatcherDept: 'Food & Beverages', icon: UtensilsCrossed },
+];
+
+function deptSlugFromName(name?: string | null): string | null {
+  if (!name) return null;
+  const n = name.toLowerCase();
+  if (n.includes('well') || n.includes('spa')) return 'wellness';
+  if (n.includes('maint') || n.includes('eng')) return 'maintenance';
+  if (n.includes('food') || n.includes('bev') || n.includes('f&b') || n.includes('dining')) return 'fnb';
+  if (n.includes('house')) return 'housekeeping';
+  return null;
+}
+
 export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
   const router = useRouter();
-  const { state, setTheme, setPersona, setActiveDispatcherDept } = useDemo();
+  const { state, setTheme, setPersona, setCurrentHotelSlug, setActiveDispatcherDept } = useDemo();
   const { t } = useI18n();
+  const {
+    login,
+    devQuickAccessEnabled,
+    devQuickAccessEntries,
+    clearDevQuickAccessEntries,
+  } = useAuth();
 
-  // Multi-Hotel Tenant Selector State
+  // Top Hotel Selector State (always shown in header; reflects dynamically added hotels)
   const [availableHotels, setAvailableHotels] = useState<HotelOption[]>(DEFAULT_PUBLIC_HOTELS);
-  const [selectedHotelSlug, setSelectedHotelSlug] = useState('grand-adp');
-  const [isLoadingHotels, setIsLoadingHotels] = useState(false);
-
-  // Department Dropdowns
-  const [dispatcherDropdownOpen, setDispatcherDropdownOpen] = useState(false);
-  const [fulfillerDropdownOpen, setFulfillerDropdownOpen] = useState(false);
-  const [selectedDept, setSelectedDept] = useState<DispatcherDepartment>(
-    state.activeDispatcherDept || 'Housekeeping',
+  const [selectedHotelSlug, setSelectedHotelSlug] = useState<string>(
+    lockedHotel?.slug || 'grand-adp',
   );
 
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
-  const [previewFulfillerDept, setPreviewFulfillerDept] = useState<FulfillerDeptKey>('housekeeping');
+  const [selectedQuickId, setSelectedQuickId] = useState<string | null>(null);
+  const [selectedQuickRole, setSelectedQuickRole] = useState<BackendRole | null>(null);
+  const [selectedDeptSlug, setSelectedDeptSlug] = useState<'housekeeping' | 'wellness' | 'maintenance' | 'fnb'>('housekeeping');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [forgotNotice, setForgotNotice] = useState<string | null>(null);
 
   const isLight = state.theme === 'light';
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-  };
+  useEffect(() => {
+    if (lockedHotel?.slug) {
+      setSelectedHotelSlug(lockedHotel.slug);
+    }
+  }, [lockedHotel?.slug]);
 
   useEffect(() => {
     if (!toastMessage) return;
-    const timer = setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
+    const timer = setTimeout(() => setToastMessage(null), 2800);
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
@@ -262,307 +266,238 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
     }
   }, [isLight, state.theme]);
 
-  const getApiUrl = () => {
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
-  };
-
-  // Fetch active hotels dynamically (Neon DB + Local Fallback)
   const fetchPublicHotels = useCallback(async () => {
-    setIsLoadingHotels(true);
-    let loadedHotels: HotelOption[] | null = null;
-
     try {
-      const res = await fetch(`${getApiUrl()}/hotels/public-list`);
+      const res = await fetch(`${getApiBaseUrl()}/hotels/public-list`, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
       if (res.ok) {
         const data: HotelOption[] = await res.json();
-        if (data && data.length > 0) {
-          loadedHotels = data;
+        if (Array.isArray(data) && data.length > 0) {
+          setAvailableHotels(data);
+          if (!lockedHotel && !data.some((h) => h.slug === selectedHotelSlug)) {
+            setSelectedHotelSlug(data[0].slug);
+          }
         }
       }
     } catch {
-      // Backend offline
+      // Keep default list when backend is temporarily unreachable
     }
-
-    if (!loadedHotels && typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem('admin_cached_hotels');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            loadedHotels = parsed.map((h: { id: number; name: string; slug: string }) => ({
-              id: h.id,
-              name: h.name,
-              slug: h.slug,
-            }));
-          }
-        }
-      } catch { }
-    }
-
-    const finalHotels = loadedHotels && loadedHotels.length > 0 ? loadedHotels : DEFAULT_PUBLIC_HOTELS;
-    setAvailableHotels(finalHotels);
-    if (!finalHotels.some((h) => h.slug === selectedHotelSlug)) {
-      setSelectedHotelSlug(finalHotels[0].slug);
-    }
-    setIsLoadingHotels(false);
-  }, [selectedHotelSlug]);
+  }, [lockedHotel, selectedHotelSlug]);
 
   useEffect(() => {
     fetchPublicHotels();
   }, [fetchPublicHotels]);
 
-  // Requirement: Clicking any role card ONLY pre-fills email and password
-  const handleSelectRole = (role: PresetRole) => {
-    setAuthError(null);
-    setSelectedRoleId(role.id);
+  // Combine session-created dev accounts + baseline dev accounts scoped to selected hotel (+ Global Admin)
+  const visibleQuickAccounts = useMemo<QuickFillItem[]>(() => {
+    if (!devQuickAccessEnabled) return [];
 
-    if (role.id === 'fulfiller') {
-      const nextOpen = !fulfillerDropdownOpen;
-      setFulfillerDropdownOpen(nextOpen);
-      setDispatcherDropdownOpen(false);
-      const profile = FULFILLER_PROFILES[previewFulfillerDept];
-      setEmail(profile.email);
-      setPassword('task123');
-      showToast(`Fulfiller (${profile.departmentName}) credentials filled`);
-      return;
+    const byEmail = new Map<string, QuickFillItem>();
+
+    // 1. Add baseline dev accounts matching global ADMIN or selected hotel
+    for (const item of DEV_BASELINE_ACCOUNTS) {
+      if (item.hotelSlug === null || item.hotelSlug.toLowerCase() === selectedHotelSlug.toLowerCase()) {
+        byEmail.set(item.email.toLowerCase(), item);
+      }
     }
 
-    if (role.id === 'dispatcher') {
-      const nextOpen = !dispatcherDropdownOpen;
-      setDispatcherDropdownOpen(nextOpen);
-      setFulfillerDropdownOpen(false);
-      const activeDeptConfig =
-        DISPATCHER_DEPARTMENTS.find((d) => d.id === selectedDept) || DISPATCHER_DEPARTMENTS[0];
-      setEmail(activeDeptConfig.email);
-      setPassword(activeDeptConfig.pass);
-      setActiveDispatcherDept(activeDeptConfig.id);
-      showToast(`Supervisor (${activeDeptConfig.name}) credentials filled`);
-      return;
+    // 2. Overlay any in-memory session-created/updated accounts (Admin/GM/Supervisor/Front Desk/Fulfiller)
+    for (const entry of devQuickAccessEntries as DevQuickAccessEntry[]) {
+      const matchesHotel =
+        entry.role === 'ADMIN' ||
+        !entry.hotelSlug ||
+        entry.hotelSlug.toLowerCase() === selectedHotelSlug.toLowerCase();
+      if (!matchesHotel) continue;
+
+      byEmail.set(entry.email.toLowerCase(), {
+        id: entry.id,
+        name: entry.fullName || ROLE_LABELS[entry.role],
+        role: entry.role,
+        email: entry.email,
+        pass: entry.initialPassword,
+        hotelSlug: entry.hotelSlug ?? null,
+        departmentName: entry.departmentName ?? null,
+        icon: roleIcon(entry.role),
+        accent: roleAccent(entry.role),
+        isSessionCreated: true,
+      });
     }
 
-    // Single-click role
-    setDispatcherDropdownOpen(false);
-    setFulfillerDropdownOpen(false);
-    setEmail(role.email);
-    setPassword(role.pass);
-    showToast(`${role.name} credentials filled`);
-  };
+    const order: Record<BackendRole, number> = {
+      ADMIN: 0,
+      GENERAL_MANAGER: 1,
+      SUPERVISOR: 2,
+      FRONT_DESK: 3,
+      FULFILLER: 4,
+      GUEST: 5,
+    };
 
-  const handleSelectFulfillerDept = (dept: FulfillerDeptKey) => {
-    setPreviewFulfillerDept(dept);
-    const profile = FULFILLER_PROFILES[dept];
-    setSelectedRoleId('fulfiller');
-    setEmail(profile.email);
-    setPassword('task123');
-    showToast(`Fulfiller (${profile.departmentName}) credentials filled`);
-  };
-
-  const handleSelectDepartment = (dept: DispatcherDeptOption) => {
-    setSelectedDept(dept.id);
-    setSelectedRoleId('dispatcher');
-    setEmail(dept.email);
-    setPassword(dept.pass);
-    setActiveDispatcherDept(dept.id);
-    showToast(`Supervisor (${dept.name}) credentials filled`);
-  };
+    return Array.from(byEmail.values()).sort((a, b) => order[a.role] - order[b.role]);
+  }, [devQuickAccessEnabled, devQuickAccessEntries, selectedHotelSlug]);
 
   const handleReset = () => {
     setEmail('');
     setPassword('');
-    setSelectedRoleId(null);
-    setDispatcherDropdownOpen(false);
-    setFulfillerDropdownOpen(false);
+    setSelectedQuickId(null);
     setAuthError(null);
-    showToast('Form cleared');
+    setForgotNotice(null);
+    setToastMessage('Form cleared');
   };
 
   const handleToggleTheme = () => {
-    const nextTheme = isLight ? 'dark' : 'light';
-    setTheme(nextTheme);
+    setTheme(isLight ? 'dark' : 'light');
   };
 
-  const handleForgotPassword = () => {
-    if (email.trim()) {
-      showToast(`Password reset link sent to ${email.trim()}`);
-    } else {
-      showToast('Enter your email address first');
+  const handleForgotPassword = async () => {
+    setAuthError(null);
+    setForgotNotice(null);
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setAuthError('Enter your email address first to request password reset guidance.');
+      return;
+    }
+    try {
+      const res = await requestForgotPassword(trimmed);
+      setForgotNotice(res.message);
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : 'Unable to process password reset request.');
     }
   };
 
   /**
-   * Requirement 3:
-   * Dynamic Redirection upon successful form submission.
-   * Calls POST /api/auth/login, obtains JWT with role, hotelSlug, and computed redirectUrl.
+   * Quick Role Fill (Development Stage Helper).
+   * ONLY puts Email & Password into the form inputs — NEVER auto-submits and NEVER bypasses backend auth.
+   */
+  const handleQuickFill = (item: QuickFillItem) => {
+    if (!devQuickAccessEnabled) return;
+    setAuthError(null);
+    setForgotNotice(null);
+    setSelectedQuickId(item.id);
+    setSelectedQuickRole(item.role);
+    setEmail(item.email);
+    setPassword(item.pass);
+    const derived = deptSlugFromName(item.departmentName);
+    if (derived && (derived === 'housekeeping' || derived === 'wellness' || derived === 'maintenance' || derived === 'fnb')) {
+      setSelectedDeptSlug(derived);
+      const matched = QUICK_DEPT_OPTIONS.find((d) => d.slug === derived);
+      if (matched) setActiveDispatcherDept(matched.dispatcherDept);
+    }
+    setToastMessage(`${ROLE_LABELS[item.role]} email & password filled — click Sign In.`);
+  };
+
+  const handleSelectQuickDept = (dept: (typeof QUICK_DEPT_OPTIONS)[number]) => {
+    setSelectedDeptSlug(dept.slug);
+    setActiveDispatcherDept(dept.dispatcherDept);
+    setToastMessage(`Department set to ${dept.label} — click Sign In.`);
+  };
+
+  /**
+   * Real backend authentication ONLY.
+   * No offline fallback, no substring role inference, no client-side bypass.
    */
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
     setAuthError(null);
-    setIsSubmitting(true);
+    setForgotNotice(null);
 
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
+    if (!cleanEmail || !password) {
+      setAuthError('Please enter both your email address and password.');
+      return;
+    }
 
-    const payload = {
-      email: cleanEmail,
-      password: cleanPassword,
-      hotelSlug: selectedHotelSlug || 'grand-adp',
-    };
-
+    setIsSubmitting(true);
     try {
-      const res = await fetch(`${getApiUrl()}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const authUser = await login(cleanEmail, password);
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        throw new Error(errorData?.message || `Authentication failed (HTTP ${res.status})`);
+      if (authUser.hotelSlug) {
+        setCurrentHotelSlug(authUser.hotelSlug, authUser.hotelName || undefined);
       }
 
-      const authData = await res.json();
-
-      // Store JWT token & session
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('authToken', authData.token);
-        localStorage.setItem('authUser', JSON.stringify(authData));
-      }
-
-      // Sync persona for staff consoles
-      if (authData.role === 'GENERAL_MANAGER') {
+      if (authUser.role === 'GENERAL_MANAGER') {
         setPersona('general_manager');
-      } else if (authData.role === 'SUPERVISOR') {
+      } else if (authUser.role === 'SUPERVISOR') {
         setPersona('department_dispatcher_supervisor');
-      } else if (authData.role === 'FRONT_DESK') {
+      } else if (authUser.role === 'FRONT_DESK') {
         setPersona('front_desk_coordinator');
-      } else if (authData.role === 'FULFILLER') {
+      } else if (authUser.role === 'FULFILLER') {
         setPersona('task_fulfiller');
       }
 
-      showToast(`Welcome ${authData.fullName || authData.email}! Routing...`);
+      let targetUrl = authUser.redirectUrl || '/login';
+      if (authUser.role === 'SUPERVISOR' || authUser.role === 'FULFILLER') {
+        const effectiveDept = deptSlugFromName(authUser.departmentName) || selectedDeptSlug;
+        const matchedOpt = QUICK_DEPT_OPTIONS.find((d) => d.slug === effectiveDept);
+        if (matchedOpt) {
+          setActiveDispatcherDept(matchedOpt.dispatcherDept);
+        }
+        if (effectiveDept && !targetUrl.includes('dept=')) {
+          targetUrl = `${targetUrl}?dept=${encodeURIComponent(effectiveDept)}`;
+        }
+      }
 
-      // Dynamic routing to redirectUrl returned by backend
-      const targetUrl = authData.redirectUrl || '/admin/dashboard';
+      setToastMessage(`Authenticated as ${authUser.fullName}. Redirecting...`);
       router.push(targetUrl);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Login failed';
-
-      // If backend is unreachable (offline dev mode), perform client-side fallback
-      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
-        handleOfflineFallback(cleanEmail);
+      if (err instanceof ApiError) {
+        setAuthError(err.message);
+      } else if (err instanceof TypeError) {
+        setAuthError('Authentication server is unreachable. Please ensure the Spring Boot backend is running on port 8080.');
       } else {
-        setAuthError(msg);
-        showToast(msg);
+        setAuthError(err instanceof Error ? err.message : 'Authentication failed.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Graceful offline fallback if backend server is not running during local inspection
-  const handleOfflineFallback = (cleanEmail: string) => {
-    let fallbackRedirect = '/login';
-    const effectiveSlug = selectedHotelSlug || 'grand-adp';
-
-    if (cleanEmail.includes('admin') || selectedRoleId === 'admin') {
-      fallbackRedirect = '/admin/dashboard';
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'authUser',
-          JSON.stringify({ email: cleanEmail, fullName: 'Global Administrator', role: 'ADMIN' })
-        );
-      }
-    } else if (cleanEmail.includes('gm') || selectedRoleId === 'gm') {
-      setPersona('general_manager');
-      fallbackRedirect = `/hotel/${effectiveSlug}/gm`;
-    } else if (cleanEmail.includes('dispatcher') || selectedRoleId === 'dispatcher') {
-      setPersona('department_dispatcher_supervisor');
-      fallbackRedirect = `/hotel/${effectiveSlug}/supervisor`;
-    } else if (cleanEmail.includes('frontdesk') || selectedRoleId === 'frontdesk') {
-      setPersona('front_desk_coordinator');
-      fallbackRedirect = `/hotel/${effectiveSlug}/front-desk`;
-    } else if (cleanEmail.includes('fulfiller') || selectedRoleId === 'fulfiller') {
-      setPersona('task_fulfiller');
-      fallbackRedirect = `/hotel/${effectiveSlug}/fulfiller`;
-    } else if (cleanEmail.includes('guest') || selectedRoleId === 'guest') {
-      fallbackRedirect = `/hotel/${effectiveSlug}/guest`;
-    } else {
-      setAuthError('Invalid credentials. Select a role from the Quick Role Fill panel to autofill.');
-      return;
-    }
-
-    showToast(`Offline test mode: routing to ${fallbackRedirect}`);
-    router.push(fallbackRedirect);
-  };
-
-  // Determine active display name and indicator badge color
-  let activeRoleDisplayName = '';
-  let activeRoleDotClass = 'bg-slate-400';
-
-  if (selectedRoleId) {
-    if (selectedRoleId === 'dispatcher') {
-      activeRoleDisplayName = `Supervisor (${selectedDept})`;
-      activeRoleDotClass = 'bg-gradient-to-r from-sky-500 to-blue-600';
-    } else if (selectedRoleId === 'fulfiller') {
-      activeRoleDisplayName = `Fulfiller (${FULFILLER_PROFILES[previewFulfillerDept].departmentName})`;
-      activeRoleDotClass = 'bg-gradient-to-r from-emerald-500 to-teal-600';
-    } else {
-      const found = PRESET_ROLES.find((r) => r.id === selectedRoleId);
-      if (found) {
-        activeRoleDisplayName = found.name;
-        activeRoleDotClass = `bg-gradient-to-r ${found.color}`;
-      }
-    }
-  }
+  const activeHotelName =
+    availableHotels.find((h) => h.slug === selectedHotelSlug)?.name || selectedHotelSlug;
 
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 relative overflow-x-hidden portal-login-root ${isLight ? 'bg-slate-100 text-slate-900 light-mode' : 'bg-[#080d1a] text-slate-100 dark-mode'
-        }`}
+      className={`min-h-screen flex flex-col font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 relative overflow-x-hidden portal-login-root ${
+        isLight ? 'bg-slate-100 text-slate-900 light-mode' : 'bg-[#080d1a] text-slate-100 dark-mode'
+      }`}
       data-theme={state.theme}
     >
-      {/* Ambient background glow elements */}
       <div className="glow-sphere-1" />
       <div className="glow-sphere-2" />
 
       {/* Top Navigation Header */}
       <header
-        className={`relative z-20 px-5 sm:px-10 py-3.5 sm:py-4 flex items-center justify-between portal-login-header ${isLight
+        className={`relative z-20 px-5 sm:px-10 py-3.5 sm:py-4 flex items-center justify-between portal-login-header ${
+          isLight
             ? 'border-b border-slate-200/70 bg-[#ffffff]/80 backdrop-blur-md'
             : 'border-b border-white/10 bg-[#070c17]/80 backdrop-blur-md'
-          }`}
+        }`}
       >
-        {/* Brand badge */}
         <Link href="/" className="flex items-center gap-3.5 group">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#dfb96c] to-[#a47b31] text-slate-950 flex items-center justify-center font-bold shadow-sm shadow-amber-900/20 ring-1 ring-amber-300/30">
             <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <span
-              className={`font-bold text-[15px] tracking-wide block ${isLight ? 'text-slate-900' : 'text-slate-100'
-                }`}
-            >
+            <span className={`font-bold text-[15px] tracking-wide block ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
               The Grand ADP
             </span>
-            <span
-              className={`text-[11px] block -mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'
-                }`}
-            >
+            <span className={`text-[11px] block -mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
               Multi-Tenant Hospitality Portal
             </span>
           </div>
         </Link>
 
-        {/* Right controls */}
         <div className="flex items-center gap-2.5">
           <Link
             href="/"
-            className={`hidden sm:inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all portal-header-btn ${isLight
+            className={`hidden sm:inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all portal-header-btn ${
+              isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-400 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-              }`}
+            }`}
           >
             <Globe className="w-4 h-4" />
             <span>{t('nav.publicSite')}</span>
@@ -575,10 +510,11 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
             id="resetDemoBtn"
             onClick={handleReset}
             title="Clear form"
-            className={`inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all cursor-pointer portal-header-btn ${isLight
+            className={`inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all cursor-pointer portal-header-btn ${
+              isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-400 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-              }`}
+            }`}
           >
             <RotateCcw className="w-4 h-4" />
             <span>{t('common.clear')}</span>
@@ -589,39 +525,44 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
             id="themeToggleBtn"
             onClick={handleToggleTheme}
             aria-label={isLight ? 'Switch to dark theme' : 'Switch to light theme'}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer portal-header-btn ${isLight
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer portal-header-btn ${
+              isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-300 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-              }`}
+            }`}
           >
             {isLight ? <Sun className="w-4.5 h-4.5 text-amber-500" /> : <Moon className="w-4.5 h-4.5 text-slate-300" />}
           </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <main className="relative z-10 flex-1 max-w-[1140px] w-full mx-auto px-5 sm:px-8 py-8 sm:py-12 flex flex-col justify-center">
-        {/* Title & Multi-Tenant Hotel Toggle Header */}
+        {/* Title & Minimal Top Hotel Selector Toggle */}
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1
-              className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'
-                }`}
+              className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}
             >
               Unified Portal Login
             </h1>
+            <p className={`text-xs sm:text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              Sign in with your work email and password. Role &amp; hotel access are verified by the backend.
+            </p>
           </div>
 
-          {/* Dynamic Hotel Property Tenant Chooser Toggle */}
+          {/* Minimal Hotel Property Toggle Bar (Always visible, reflects newly added hotels) */}
           <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider uppercase text-amber-500">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase text-amber-500">
               <Building2 className="w-3.5 h-3.5" />
-              <span>Select Hotel Tenant</span>
+              <span>Hotel</span>
             </div>
-
             <div
-              className={`flex flex-wrap items-center gap-1.5 p-1 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
-                }`}
+              className={`flex flex-wrap items-center gap-1 p-1 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${
+                isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
+              }`}
             >
               {availableHotels.map((hotel) => {
                 const isSelected = selectedHotelSlug === hotel.slug;
@@ -631,17 +572,17 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                     type="button"
                     onClick={() => {
                       setSelectedHotelSlug(hotel.slug);
-                      showToast(`Switched hotel scope to ${hotel.name}`);
+                      setSelectedQuickId(null);
                     }}
                     aria-pressed={isSelected}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${isSelected
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      isSelected
                         ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-xs'
                         : isLight
-                          ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                          : 'text-slate-400 hover:text-white hover:bg-white/5'
-                      }`}
+                        ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
                   >
-                    <Building2 className={`w-3.5 h-3.5 ${isSelected ? 'text-slate-950' : 'text-amber-500/70'}`} />
                     <span>{hotel.name}</span>
                     {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
                   </button>
@@ -651,92 +592,93 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
           </div>
         </div>
 
-        {/* 12-Column Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 sm:gap-8 items-start">
-          {/* LEFT: Clean Login Card (lg:col-span-5) */}
-          <section className="lg:col-span-5 w-full">
+        {/* Grid Layout */}
+        <div
+          className={
+            devQuickAccessEnabled
+              ? 'grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7 items-start'
+              : 'max-w-md w-full mx-auto'
+          }
+        >
+          {/* LEFT: Clean Login Form Card */}
+          <section className={devQuickAccessEnabled ? 'lg:col-span-5 w-full' : 'w-full'}>
             <div
-              className={`rounded-2xl p-7 sm:p-8 backdrop-blur-xl transition-all portal-card-left ${isLight
+              className={`rounded-2xl p-6 sm:p-7 backdrop-blur-xl transition-all portal-card-left ${
+                isLight
                   ? 'bg-[#ffffff]/95 border border-slate-200/80 shadow-xl shadow-slate-900/10'
                   : 'bg-[#0c1424]/90 border border-white/10 shadow-2xl shadow-black/50'
-                }`}
+              }`}
             >
               <div
-                className={`flex items-center justify-between pb-4 mb-6 border-b ${isLight ? 'border-slate-200/60' : 'border-white/5'
-                  }`}
+                className={`flex items-center justify-between pb-3.5 mb-5 border-b ${
+                  isLight ? 'border-slate-200/60' : 'border-white/5'
+                }`}
               >
                 <h2
-                  className={`text-xs sm:text-sm font-semibold tracking-wide uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'
-                    }`}
+                  className={`text-xs sm:text-sm font-semibold tracking-wide uppercase ${
+                    isLight ? 'text-slate-500' : 'text-slate-400'
+                  }`}
                 >
                   Sign In
                 </h2>
-                <div
-                  id="activeRoleTag"
-                  className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium portal-active-role-tag ${isLight
-                      ? 'bg-slate-100 text-slate-600 border border-slate-200'
-                      : 'bg-white/5 text-slate-300 border border-white/10'
-                    }`}
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium ${
+                    isLight
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                  }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${activeRoleDotClass}`} />
-                  <span id="activeRoleName" className="truncate max-w-[150px]">
-                    {activeRoleDisplayName}
-                  </span>
-                </div>
+                  <Lock className="w-3 h-3" />
+                  <span>Backend Verified</span>
+                </span>
               </div>
 
-              {/* Scanned QR Verified Hotel Banner */}
               {lockedHotel && (
                 <div
-                  className={`mb-5 p-3.5 rounded-2xl border flex items-center justify-between gap-3 animate-in fade-in duration-200 ${
+                  className={`mb-4 p-3 rounded-xl border flex items-center justify-between gap-2 text-xs ${
                     isLight
-                      ? 'bg-amber-50/90 border-amber-200/90 text-amber-950'
+                      ? 'bg-amber-50 border-amber-200 text-amber-950'
                       : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center font-bold flex-shrink-0">
-                      <Building2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                        Scanned Property Portal
-                      </div>
-                      <div className="font-bold text-xs sm:text-sm">
-                        {lockedHotel.name}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400">
-                      Hotel ID #{lockedHotel.id}
-                    </span>
-                  </div>
+                  <span className="font-semibold">{lockedHotel.name}</span>
+                  <span className="font-mono text-[11px]">ID #{lockedHotel.id}</span>
                 </div>
               )}
 
-              {/* Error Alert */}
               {authError && (
-                <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2 animate-in fade-in">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <div
+                  role="alert"
+                  className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-400 text-xs flex items-start gap-2"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{authError}</span>
                 </div>
               )}
 
-              {/* Form */}
-              <form id="loginForm" onSubmit={handleLoginSubmit} className="space-y-4 sm:space-y-5">
-                {/* Email Field */}
+              {forgotNotice && (
+                <div
+                  role="status"
+                  className="mb-4 p-3 rounded-xl bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs flex items-start gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{forgotNotice}</span>
+                </div>
+              )}
+
+              <form id="loginForm" onSubmit={handleLoginSubmit} className="space-y-4">
                 <div>
                   <label
                     htmlFor="emailInput"
-                    className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${isLight ? 'text-slate-500' : 'text-slate-400'
-                      }`}
+                    className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
+                      isLight ? 'text-slate-500' : 'text-slate-400'
+                    }`}
                   >
                     Email
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="w-5 h-5" />
+                      <Mail className="w-4 h-4" />
                     </span>
                     <input
                       type="email"
@@ -745,37 +687,37 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@thegrandadp.com"
-                      className={`w-full pl-11 pr-4 py-3 text-sm sm:text-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all shadow-2xs portal-input ${isLight
+                      placeholder="name@hotel-domain.com"
+                      className={`w-full pl-10 pr-4 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all portal-input ${
+                        isLight
                           ? 'bg-slate-50 text-slate-900 placeholder-slate-400 border border-slate-200'
                           : 'bg-[#070d18] text-white placeholder-slate-500 border border-white/10'
-                        }`}
+                      }`}
                     />
                   </div>
                 </div>
 
-                {/* Password Field */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label
                       htmlFor="passwordInput"
-                      className={`block text-xs font-semibold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'
-                        }`}
+                      className={`block text-xs font-semibold uppercase tracking-wider ${
+                        isLight ? 'text-slate-500' : 'text-slate-400'
+                      }`}
                     >
                       Password
                     </label>
                     <button
                       type="button"
                       onClick={handleForgotPassword}
-                      className={`text-xs cursor-pointer hover:underline ${isLight ? 'text-amber-600' : 'text-amber-400'
-                        }`}
+                      className="text-xs font-medium text-amber-500 hover:text-amber-400 transition-colors cursor-pointer"
                     >
-                      Forgot?
+                      Forgot password?
                     </button>
                   </div>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-5 h-5" />
+                      <Lock className="w-4 h-4" />
                     </span>
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -784,230 +726,175 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className={`w-full pl-11 pr-11 py-3 text-sm sm:text-[15px] rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all shadow-2xs portal-input ${isLight
+                      placeholder="Enter your password"
+                      className={`w-full pl-10 pr-10 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all portal-input ${
+                        isLight
                           ? 'bg-slate-50 text-slate-900 placeholder-slate-400 border border-slate-200'
                           : 'bg-[#070d18] text-white placeholder-slate-500 border border-white/10'
-                        }`}
+                      }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      aria-label="Toggle password visibility"
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs sm:text-[13px] pt-1">
-                  <label
-                    className={`flex items-center gap-2.5 cursor-pointer select-none ${isLight ? 'text-slate-600' : 'text-slate-400'
-                      }`}
-                  >
-                    <input
-                      type="checkbox"
-                      id="rememberMe"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded text-amber-500 bg-slate-100 border-slate-300 focus:ring-0"
-                    />
-                    <span>Remember me</span>
-                  </label>
-                </div>
-
-                {/* Submit Button */}
                 <button
                   type="submit"
                   id="submitBtn"
                   disabled={isSubmitting}
-                  className="w-full mt-3 py-3.5 px-5 rounded-xl font-semibold text-xs sm:text-sm uppercase tracking-wider text-slate-950 bg-gradient-to-r from-[#dfb96c] to-[#c79a40] hover:from-[#e8c57b] hover:to-[#d8a84a] shadow-md shadow-amber-900/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
+                  className="w-full py-3 px-5 rounded-xl font-bold text-sm tracking-wide bg-gradient-to-r from-[#e2bc6b] via-[#d3a74d] to-[#c29136] text-slate-950 hover:from-[#ebd088] hover:to-[#d3a243] shadow-lg shadow-amber-900/25 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
                 >
-                  <span id="submitBtnText">{isSubmitting ? 'Authenticating…' : 'Sign In'}</span>
+                  <span>{isSubmitting ? 'Authenticating...' : 'Sign In'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             </div>
           </section>
 
-          {/* RIGHT: Quick Role Fill Section (lg:col-span-7) */}
-          <section className="lg:col-span-7 w-full">
-            <div
-              className={`rounded-2xl p-6 sm:p-7 backdrop-blur-xl transition-all portal-card-right ${isLight
-                  ? 'bg-[#ffffff]/90 border border-slate-200/70 shadow-sm'
-                  : 'bg-[#0c1424]/70 border border-white/10 shadow-sm'
+          {/* RIGHT: Minimal Quick Role Fill Panel (Dev Stage Only — Autofill Inputs Only, Never Bypasses Auth) */}
+          {devQuickAccessEnabled && (
+            <section className="lg:col-span-7 w-full" data-testid="dev-quick-access-panel">
+              <div
+                className={`rounded-2xl p-6 backdrop-blur-xl border transition-all portal-card-right ${
+                  isLight
+                    ? 'bg-[#ffffff]/90 border-slate-200/80 shadow-sm'
+                    : 'bg-[#0c1424]/75 border-white/10 shadow-sm'
                 }`}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <span
-                  className={`text-xs sm:text-[13px] font-semibold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'
-                    }`}
-                >
-                  Quick Role Fill
-                </span>
-                <span className="text-xs font-mono text-slate-400">
-                  Pre-fills inputs only &bull; Auth enforced
-                </span>
-              </div>
-
-              {/* 6 Exact Roles Grid matching requirement */}
-              <div id="roleGrid" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {PRESET_ROLES.map((role) => {
-                  const isFulfiller = role.id === 'fulfiller';
-                  const isDispatcher = role.id === 'dispatcher';
-                  const isSelected = selectedRoleId === role.id;
-                  const Icon = role.icon;
-
-                  return (
-                    <React.Fragment key={role.id}>
+              >
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="w-4 h-4 text-amber-400" />
+                    <span
+                      className={`text-xs font-bold uppercase tracking-wider ${
+                        isLight ? 'text-slate-700' : 'text-slate-200'
+                      }`}
+                    >
+                      Quick Access (Dev) · {activeHotelName}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Fills inputs only &bull; Click Sign In
+                    </span>
+                    {devQuickAccessEntries.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => handleSelectRole(role)}
-                        className={`w-full text-left flex items-center justify-between p-3 sm:p-3.5 rounded-xl border transition-all duration-150 cursor-pointer portal-role-btn ${isSelected
-                            ? 'portal-role-selected ' +
-                            (isLight
-                              ? 'bg-amber-400/15 border-amber-400/80 text-slate-950 ring-1 ring-amber-400/30'
-                              : 'bg-amber-400/10 border-amber-400/70 text-white')
-                            : isLight
-                              ? 'bg-[#ffffff]/80 border-slate-200/80 hover:border-slate-300 hover:bg-[#ffffff] text-slate-700 shadow-2xs'
-                              : 'bg-white/[0.03] border-white/5 hover:border-white/20 text-slate-300'
-                          }`}
+                        onClick={clearDevQuickAccessEntries}
+                        title="Clear session-created entries"
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-white/5 cursor-pointer"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br ${role.color} text-white flex items-center justify-center flex-shrink-0 shadow-sm`}
-                          >
-                            <Icon className="w-4.5 h-4.5" />
-                          </div>
-                          <span className="text-xs sm:text-[13.5px] font-medium truncate">
-                            {role.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                          {(isDispatcher || isFulfiller) && (
-                            <ChevronDown
-                              className={`w-4 h-4 text-slate-400 transition-transform ${(isDispatcher && dispatcherDropdownOpen) ||
-                                  (isFulfiller && fulfillerDropdownOpen)
-                                  ? 'rotate-180'
-                                  : ''
-                                }`}
-                            />
-                          )}
-                          <span className="text-xs font-mono text-slate-400">
-                            {role.num}
-                          </span>
-                        </div>
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                    )}
+                  </div>
+                </div>
 
-                      {/* Dispatcher minimal department options */}
-                      {isDispatcher && dispatcherDropdownOpen && (
-                        <div
-                          className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${isLight
-                              ? 'bg-slate-100/90 border-slate-200/80'
-                              : 'bg-[#070d18]/90 border-white/10'
-                            }`}
+                {visibleQuickAccounts.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-white/15 p-5 text-center text-xs text-slate-400">
+                    No dev accounts cached for <strong>{activeHotelName}</strong> yet. Accounts created by Admin or GM during this session will appear here automatically.
+                  </div>
+                ) : (
+                  <div id="roleGrid" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {visibleQuickAccounts.map((item) => {
+                      const Icon = item.icon;
+                      const isSelected = selectedQuickId === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleQuickFill(item)}
+                          className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? isLight
+                                ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-400/50'
+                                : 'bg-amber-500/10 border-amber-400/60 ring-1 ring-amber-400/30'
+                              : isLight
+                              ? 'bg-slate-50/90 hover:bg-white border-slate-200 hover:border-amber-300'
+                              : 'bg-[#070d18]/80 hover:bg-white/[0.04] border-white/10 hover:border-amber-500/40'
+                          }`}
                         >
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {DISPATCHER_DEPARTMENTS.map((dept) => {
-                              const DeptIcon = dept.icon;
-                              const isDeptActive = isSelected && selectedDept === dept.id;
-                              return (
-                                <button
-                                  type="button"
-                                  key={dept.id}
-                                  onClick={() => handleSelectDepartment(dept)}
-                                  className={`w-full text-left flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all text-xs sm:text-[13px] font-medium cursor-pointer portal-subdept-btn ${isDeptActive
-                                      ? 'portal-subdept-active ' +
-                                      (isLight
-                                        ? 'bg-amber-400/15 border-amber-400/80 text-slate-950'
-                                        : 'bg-amber-400/10 border-amber-400/70 text-white')
-                                      : isLight
-                                        ? 'bg-[#ffffff] border-slate-200/80 hover:border-slate-300 text-slate-700 shadow-2xs'
-                                        : 'bg-white/[0.04] border-white/5 hover:border-white/20 text-slate-300'
-                                    }`}
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div
-                                      className={`w-7 h-7 rounded-lg bg-gradient-to-br ${dept.color} text-white flex items-center justify-center flex-shrink-0 shadow-xs`}
-                                    >
-                                      <DeptIcon className="w-3.5 h-3.5" />
-                                    </div>
-                                    <span className="truncate">{dept.name}</span>
-                                  </div>
-                                  {isDeptActive && (
-                                    <Check className="w-4 h-4 text-amber-500 flex-shrink-0 ml-1.5" />
-                                  )}
-                                </button>
-                              );
-                            })}
+                          <div
+                            className={`w-9 h-9 rounded-lg bg-gradient-to-br ${item.accent} text-white flex items-center justify-center shrink-0 shadow-xs`}
+                          >
+                            <Icon className="w-4 h-4" />
                           </div>
-                        </div>
-                      )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span
+                                className={`font-semibold text-xs truncate ${
+                                  isLight ? 'text-slate-900' : 'text-white'
+                                }`}
+                              >
+                                {item.name}
+                              </span>
+                              <span className="text-[10px] font-medium text-amber-400 shrink-0">
+                                {ROLE_LABELS[item.role]}
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
+                              {item.email}
+                            </div>
+                            {item.departmentName && (
+                              <div className="text-[10px] text-sky-400 truncate">
+                                {item.departmentName}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                      {/* Task Fulfiller minimal department options */}
-                      {isFulfiller && fulfillerDropdownOpen && (
-                        <div
-                          className={`col-span-full p-3 rounded-xl border animate-in fade-in duration-200 portal-subdept-container ${isLight
-                              ? 'bg-slate-100/90 border-slate-200/80'
-                              : 'bg-[#070d18]/90 border-white/10'
+                {/* Minimal Department Selector when Supervisor or Fulfiller is chosen */}
+                {(selectedQuickRole === 'SUPERVISOR' || selectedQuickRole === 'FULFILLER') && (
+                  <div className="mt-3.5 pt-3.5 border-t border-white/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+                        Select Department ({ROLE_LABELS[selectedQuickRole]})
+                      </span>
+                      <span className="text-[10px] text-slate-400">Applies on Sign In</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {QUICK_DEPT_OPTIONS.map((dept) => {
+                        const DeptIcon = dept.icon;
+                        const active = selectedDeptSlug === dept.slug;
+                        return (
+                          <button
+                            key={dept.slug}
+                            type="button"
+                            onClick={() => handleSelectQuickDept(dept)}
+                            className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              active
+                                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-xs'
+                                : isLight
+                                ? 'bg-slate-50 hover:bg-white border-slate-200 text-slate-700'
+                                : 'bg-[#070d18] hover:bg-white/[0.05] border-white/10 text-slate-300'
                             }`}
-                        >
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {FULFILLER_DEPARTMENTS.map((fd) => {
-                              const profile = FULFILLER_PROFILES[fd.key];
-                              const isDeptActive = isSelected && previewFulfillerDept === fd.key;
-                              return (
-                                <button
-                                  type="button"
-                                  key={fd.key}
-                                  onClick={() => handleSelectFulfillerDept(fd.key)}
-                                  className={`w-full text-left flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all text-xs sm:text-[13px] font-medium cursor-pointer portal-subdept-btn ${isDeptActive
-                                      ? 'portal-subdept-active ' +
-                                      (isLight
-                                        ? 'bg-amber-400/15 border-amber-400/80 text-slate-950'
-                                        : 'bg-amber-400/10 border-amber-400/70 text-white')
-                                      : isLight
-                                        ? 'bg-[#ffffff] border-slate-200/80 hover:border-slate-300 text-slate-700 shadow-2xs'
-                                        : 'bg-white/[0.04] border-white/5 hover:border-white/20 text-slate-300'
-                                    }`}
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div
-                                      className={`w-7 h-7 rounded-lg bg-gradient-to-br ${profile.colorGradient} text-white flex items-center justify-center flex-shrink-0 shadow-xs`}
-                                    >
-                                      <ClipboardCheck className="w-3.5 h-3.5" />
-                                    </div>
-                                    <span className="truncate">{fd.name}</span>
-                                  </div>
-                                  {isDeptActive && (
-                                    <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 ml-1.5" />
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+                          >
+                            <DeptIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{dept.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </section>
+            </section>
+          )}
         </div>
       </main>
 
-      {/* Custom Alert Toast */}
       {toastMessage && (
-        <div
-          role="status"
-          className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 pointer-events-none"
-        >
-          <div className="bg-slate-900 dark:bg-slate-800 text-white text-xs sm:text-[13px] px-4 py-3 rounded-xl shadow-lg border border-white/10 flex items-center gap-2.5">
-            <Info className="w-4 h-4 text-cyan-400" />
-            <span>{toastMessage}</span>
-          </div>
+        <div className="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl bg-[#0c1424]/95 border border-amber-500/30 text-amber-200 text-xs font-medium shadow-2xl">
+          {toastMessage}
         </div>
       )}
     </div>

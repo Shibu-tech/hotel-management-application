@@ -1,7 +1,10 @@
 package com.hotel.backend.controller;
 
 import com.hotel.backend.dto.CreateHotelRequest;
+import com.hotel.backend.dto.EmployeeCredentialResponse;
 import com.hotel.backend.dto.HotelAdminResponse;
+import com.hotel.backend.dto.ResetPasswordRequest;
+import com.hotel.backend.dto.UpdateHotelRequest;
 import com.hotel.backend.service.AdminHotelService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -22,42 +25,39 @@ public class AdminHotelController {
         this.adminHotelService = adminHotelService;
     }
 
-    /**
-     * Requirement 2:
-     * Returns a list of all active hotels in the database with their slugs, names, and General Manager emails.
-     */
     @GetMapping
     public ResponseEntity<List<HotelAdminResponse>> getAllHotels() {
-        List<HotelAdminResponse> hotels = adminHotelService.getAllHotelsForAdmin();
-        return ResponseEntity.ok(hotels);
+        return ResponseEntity.ok(adminHotelService.getAllHotelsForAdmin());
     }
 
-    /**
-     * Requirement 2:
-     * Allows the global ADMIN to dynamically create a new hotel tenant AND provision
-     * its first GENERAL_MANAGER account in a single @Transactional operation.
-     */
     @PostMapping
     public ResponseEntity<HotelAdminResponse> createHotel(@Valid @RequestBody CreateHotelRequest request) {
         HotelAdminResponse createdHotel = adminHotelService.createHotelWithGeneralManager(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdHotel);
     }
 
-    /**
-     * Allows the global ADMIN to dynamically delete a hotel tenant and its associated accounts.
-     */
+    @PutMapping("/{id}")
+    public ResponseEntity<HotelAdminResponse> updateHotel(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateHotelRequest request) {
+        return ResponseEntity.ok(adminHotelService.updateHotel(id, request));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteHotel(@PathVariable Long id) {
         adminHotelService.deleteHotel(id);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Allows the global ADMIN to toggle hotel active status (suspend / reactivate).
-     */
     @PatchMapping("/{id}/toggle-active")
     public ResponseEntity<HotelAdminResponse> toggleHotelActive(@PathVariable Long id) {
-        HotelAdminResponse updated = adminHotelService.toggleHotelActive(id);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(adminHotelService.toggleHotelActive(id));
+    }
+
+    @PostMapping("/{id}/reset-gm-password")
+    public ResponseEntity<EmployeeCredentialResponse> resetGmPassword(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) ResetPasswordRequest request) {
+        return ResponseEntity.ok(adminHotelService.resetGeneralManagerPassword(id, request));
     }
 }

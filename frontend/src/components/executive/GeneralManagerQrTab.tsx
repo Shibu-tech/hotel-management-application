@@ -15,18 +15,19 @@ import {
   Smartphone,
 } from 'lucide-react';
 import {
-  getAuthSessionUser,
-  getApiBaseUrl,
   fetchHotelQrDestinationUrl,
   downloadHotelQrCode,
   copyHotelLoginUrl,
   type GmAssignedHotel,
 } from '@/lib/hotelQrApi';
+import { apiFetch } from '@/lib/authApi';
+import { useAuth } from '@/lib/authContext';
 import { useDemo } from '@/lib/store';
 import { HotelQrImage } from '@/components/shared/HotelQrImage';
 
 export function GeneralManagerQrTab() {
   const { state } = useDemo();
+  const { user } = useAuth();
   const isLight = state.theme === 'light';
 
   const [loading, setLoading] = useState(true);
@@ -43,9 +44,7 @@ export function GeneralManagerQrTab() {
     setQrLoaded(false);
 
     try {
-      const user = getAuthSessionUser();
-
-      // Check if user has an assigned hotel
+      // Check if authenticated session user has an assigned hotel
       if (!user || !user.hotelId) {
         setAssignedHotel(null);
         setLoading(false);
@@ -53,12 +52,9 @@ export function GeneralManagerQrTab() {
       }
 
       const hotelId = Number(user.hotelId);
-      const baseUrl = getApiBaseUrl();
 
       // Fetch verified hotel details from backend
-      const res = await fetch(`${baseUrl}/hotels/${hotelId}/public`, {
-        headers: { Accept: 'application/json' },
-      });
+      const res = await apiFetch(`/hotels/${hotelId}/public`);
 
       if (!res.ok) {
         throw new Error(`Failed to load hotel profile (HTTP ${res.status})`);
@@ -75,12 +71,12 @@ export function GeneralManagerQrTab() {
       // Fetch dynamic destination URL
       const url = await fetchHotelQrDestinationUrl(hotelId);
       setDestinationUrl(url);
-    } catch (err: any) {
-      setError(err.message || 'Unable to load assigned hotel QR information.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to load assigned hotel QR information.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadGmHotelData();
@@ -100,8 +96,8 @@ export function GeneralManagerQrTab() {
     setDownloading(true);
     try {
       await downloadHotelQrCode(assignedHotel.hotelId);
-    } catch (err: any) {
-      alert(err.message || 'Download failed');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Download failed');
     } finally {
       setDownloading(false);
     }
@@ -173,8 +169,6 @@ export function GeneralManagerQrTab() {
       </div>
     );
   }
-
-  const qrImageUrl = `${getApiBaseUrl()}/hotels/${assignedHotel.hotelId}/qr`;
 
   // State 4: Normal GM Hotel QR Code View
   return (

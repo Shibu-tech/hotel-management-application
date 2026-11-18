@@ -28,6 +28,15 @@ public class Hotel {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "contact_email", length = 150)
+    private String contactEmail;
+
+    @Column(name = "contact_phone", length = 40)
+    private String contactPhone;
+
+    @Column(name = "address", length = 255)
+    private String address;
+
     @JsonIgnore
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<User> users = new ArrayList<>();
@@ -43,11 +52,14 @@ public class Hotel {
     public Hotel() {
     }
 
-    public Hotel(Long id, String name, String slug, boolean active, List<User> users, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public Hotel(Long id, String name, String slug, boolean active, String contactEmail, String contactPhone, String address, List<User> users, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.name = name;
         this.slug = slug;
         this.active = active;
+        this.contactEmail = contactEmail;
+        this.contactPhone = contactPhone;
+        this.address = address;
         this.users = users != null ? users : new ArrayList<>();
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -62,6 +74,9 @@ public class Hotel {
         private String name;
         private String slug;
         private boolean active = true;
+        private String contactEmail;
+        private String contactPhone;
+        private String address;
         private List<User> users = new ArrayList<>();
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
@@ -70,12 +85,15 @@ public class Hotel {
         public Builder name(String name) { this.name = name; return this; }
         public Builder slug(String slug) { this.slug = slug; return this; }
         public Builder active(boolean active) { this.active = active; return this; }
+        public Builder contactEmail(String contactEmail) { this.contactEmail = contactEmail; return this; }
+        public Builder contactPhone(String contactPhone) { this.contactPhone = contactPhone; return this; }
+        public Builder address(String address) { this.address = address; return this; }
         public Builder users(List<User> users) { this.users = users; return this; }
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
 
         public Hotel build() {
-            return new Hotel(id, name, slug, active, users, createdAt, updatedAt);
+            return new Hotel(id, name, slug, active, contactEmail, contactPhone, address, users, createdAt, updatedAt);
         }
     }
 
@@ -90,6 +108,15 @@ public class Hotel {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public String getContactEmail() { return contactEmail; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+
+    public String getContactPhone() { return contactPhone; }
+    public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }
+
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 
     public List<User> getUsers() { return users; }
     public void setUsers(List<User> users) { this.users = users; }

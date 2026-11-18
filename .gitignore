@@ -22,7 +22,11 @@ frontend/.env.test.local
 frontend/.env.production.local
 frontend/.env
 
-# Java Spring Boot Backend Build Artifacts
+# Java Spring Boot Backend Build Artifacts & Local Secrets
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/src/main/resources/application-local.properties
 backend/target/
 backend/.mvn/wrapper/dists/
 backend/.m2/
