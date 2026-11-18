@@ -22,4 +22,6 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     void deleteByHotelAndRoomNumber(Hotel hotel, String roomNumber);
 
     void deleteByHotelAndFloor(Hotel hotel, Integer floor);
+
+    void deleteByHotelId(Long hotelId);
 }

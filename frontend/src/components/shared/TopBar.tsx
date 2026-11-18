@@ -56,6 +56,7 @@ import { ServiceAuthorityModal } from '@/components/shared/ServiceAuthorityModal
 import { GestureGuideModal } from '@/components/shared/GestureGuideModal';
 import { LanguageSelector } from '@/components/shared/LanguageSelector';
 import { useDemo } from '@/lib/store';
+import { useAuth } from '@/lib/authContext';
 import { useI18n } from '@/lib/i18n';
 import { HOME_ACCENT, quickLinks, roles, roleById } from '@/lib/roles';
 import { accentVars, cn } from '@/lib/utils';
@@ -70,6 +71,7 @@ interface TopBarProps {
 export function TopBar({ active, showRail = true, hideGestureButton = false }: TopBarProps) {
   const router = useRouter();
   const { t } = useI18n();
+  const { logout } = useAuth();
   const { state, reset, setTheme, markNotificationRead, clearAllNotifications, gestureGuideOpen, setGestureGuideOpen, currentHotelName, currentHotelSlug } = useDemo();
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [policiesModalOpen, setPoliciesModalOpen] = useState(false);
@@ -192,9 +194,10 @@ export function TopBar({ active, showRail = true, hideGestureButton = false }: T
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [notifDropdownOpen, profileCardOpen]);
 
-  function handleLogoutConfirm() {
+  async function handleLogoutConfirm() {
     setLogoutModalOpen(false);
-    router.push('/login');
+    await logout();
+    router.replace('/login');
   }
 
   const isLight = state.theme === 'light';

@@ -22,8 +22,12 @@ public class JwtUtil {
     private final long expirationMs;
 
     public JwtUtil(
-            @Value("${app.jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}") String secret,
+            @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.expiration-ms:86400000}") long expirationMs) {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be configured via environment variable and be at least 32 UTF-8 bytes long.");
+        }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
     }
@@ -32,17 +36,18 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("role", user.getRole().name());
-        claims.put("fullName", user.getFullName());
+        claims.put("tokenVersion", user.getTokenVersion());
+        claims.put("mustChangePassword", user.isMustChangePassword());
 
         String hotelSlug = null;
         if (user.getHotel() != null) {
             hotelSlug = user.getHotel().getSlug();
             claims.put("hotelId", user.getHotel().getId());
             claims.put("hotelSlug", hotelSlug);
-            claims.put("hotelName", user.getHotel().getName());
         }
-
-        claims.put("redirectUrl", computeRedirectUrl(user.getRole(), hotelSlug));
+        if (user.getDepartment() != null) {
+            claims.put("departmentId", user.getDepartment().getId());
+        }
 
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
@@ -76,6 +81,14 @@ public class JwtUtil {
         return extractAllClaims(token).get("hotelSlug", String.class);
     }
 
+    public Long extractTokenVersion(Claims claims) {
+        Object tv = claims.get("tokenVersion");
+        if (tv instanceof Number n) {
+            return n.longValue();
+        }
+        return null;
+    }
+
     public boolean validateToken(String token) {
         try {
             Claims claims = extractAllClaims(token);
@@ -85,28 +98,30 @@ public class JwtUtil {
         }
     }
 
+    public long getExpirationMs() {
+        return expirationMs;
+    }
+
     /**
-     * Requirement 3:
-     * Compute exact redirectUrl based on user Role and tenant hotelSlug:
-     * - ADMIN -> /admin/dashboard
-     * - GENERAL_MANAGER -> /hotel/[slug]/gm
-     * - SUPERVISOR -> /hotel/[slug]/supervisor
-     * - FRONT_DESK -> /hotel/[slug]/front-desk
-     * - FULFILLER -> /hotel/[slug]/fulfiller
-     * - GUEST -> /hotel/[slug]/guest
+     * Compute authoritative redirect URL from DB-resolved Role and tenant hotelSlug.
      */
     public static String computeRedirectUrl(Role role, String hotelSlug) {
         if (role == null) {
             return "/login";
         }
-        String safeSlug = (hotelSlug != null && !hotelSlug.isBlank()) ? hotelSlug : "grand-adp";
+        if (role == Role.ADMIN) {
+            return "/admin/dashboard";
+        }
+        if (hotelSlug == null || hotelSlug.isBlank()) {
+            return "/login";
+        }
         return switch (role) {
+            case GENERAL_MANAGER -> "/hotel/" + hotelSlug + "/gm";
+            case SUPERVISOR -> "/hotel/" + hotelSlug + "/supervisor";
+            case FRONT_DESK -> "/hotel/" + hotelSlug + "/front-desk";
+            case FULFILLER -> "/hotel/" + hotelSlug + "/fulfiller";
+            case GUEST -> "/hotel/" + hotelSlug + "/guest";
             case ADMIN -> "/admin/dashboard";
-            case GENERAL_MANAGER -> "/hotel/" + safeSlug + "/gm";
-            case SUPERVISOR -> "/hotel/" + safeSlug + "/supervisor";
-            case FRONT_DESK -> "/hotel/" + safeSlug + "/front-desk";
-            case FULFILLER -> "/hotel/" + safeSlug + "/fulfiller";
-            case GUEST -> "/hotel/" + safeSlug + "/guest";
         };
     }
 }

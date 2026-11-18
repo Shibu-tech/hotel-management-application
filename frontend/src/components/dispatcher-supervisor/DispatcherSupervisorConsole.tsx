@@ -25,6 +25,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { useDemo } from '@/lib/store';
+import { useAuth } from '@/lib/authContext';
 import type { SupervisorInspection, RoleId, DispatcherDepartment, WorkItem, StaffAccount } from '@/types/demo';
 
 // Dispatcher Tabs
@@ -90,6 +91,7 @@ export function DispatcherSupervisorConsole() {
     clearAllNotifications,
   } = useDemo();
 
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<DispatcherSupervisorTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -99,10 +101,25 @@ export function DispatcherSupervisorConsole() {
   const [isEscalateModalOpen, setIsEscalateModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
 
-  // Department state & URL query synchronization
+  // Department state & URL query / DB assignment synchronization
   const currentDept: DispatcherDepartment = state.activeDispatcherDept || 'Housekeeping';
+  const hasLockedDbDept = Boolean(user?.departmentName);
 
   useEffect(() => {
+    const dbDept = (user?.departmentName || '').toLowerCase();
+    if (dbDept) {
+      if (dbDept.includes('well') || dbDept.includes('spa')) {
+        setActiveDispatcherDept('Wellness');
+      } else if (dbDept.includes('maint') || dbDept.includes('eng')) {
+        setActiveDispatcherDept('Maintenance & Engineering');
+      } else if (dbDept.includes('food') || dbDept.includes('bev') || dbDept.includes('f&b')) {
+        setActiveDispatcherDept('Food & Beverages');
+      } else if (dbDept.includes('house')) {
+        setActiveDispatcherDept('Housekeeping');
+      }
+      return;
+    }
+
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const deptParam = params.get('dept')?.toLowerCase();
@@ -116,7 +133,7 @@ export function DispatcherSupervisorConsole() {
         setActiveDispatcherDept('Housekeeping');
       }
     }
-  }, [setActiveDispatcherDept]);
+  }, [setActiveDispatcherDept, user?.departmentName]);
 
   // Redirect away from department-specific tabs if switched to other departments
   useEffect(() => {
@@ -414,6 +431,32 @@ export function DispatcherSupervisorConsole() {
                 )}
               </button>
             </div>
+
+            {/* Compact Department Selector (editable when account has no locked DB department) */}
+            {!sidebarCollapsed && (
+              <div className="px-2 pt-1 pb-2 border-b border-white/[0.06]">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-mist-400 mb-1">
+                  Department
+                </label>
+                {hasLockedDbDept ? (
+                  <div className="px-2.5 py-1.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-xs font-semibold text-amber-300 truncate">
+                    {user?.departmentName}
+                  </div>
+                ) : (
+                  <select
+                    aria-label="Select department"
+                    value={currentDept}
+                    onChange={(e) => setActiveDispatcherDept(e.target.value as DispatcherDepartment)}
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-ink-950/90 border border-white/15 text-xs font-semibold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                  >
+                    <option value="Housekeeping">Housekeeping</option>
+                    <option value="Wellness">Spa &amp; Wellness</option>
+                    <option value="Maintenance & Engineering">Maintenance &amp; Engineering</option>
+                    <option value="Food & Beverages">Food &amp; Beverages</option>
+                  </select>
+                )}
+              </div>
+            )}
 
             <nav className="space-y-1">
               {navItems.map((item) => {

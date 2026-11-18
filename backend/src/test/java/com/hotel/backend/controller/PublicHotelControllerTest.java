@@ -2,13 +2,12 @@ package com.hotel.backend.controller;
 
 import com.hotel.backend.dto.HotelPublicDto;
 import com.hotel.backend.exception.ResourceNotFoundException;
-import com.hotel.backend.security.JwtAuthenticationFilter;
-import com.hotel.backend.security.JwtUtil;
 import com.hotel.backend.service.HotelPublicService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,7 +18,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = PublicHotelController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 class PublicHotelControllerTest {
 
     @Autowired
@@ -27,12 +27,6 @@ class PublicHotelControllerTest {
 
     @MockitoBean
     private HotelPublicService hotelPublicService;
-
-    @MockitoBean
-    private JwtUtil jwtUtil;
-
-    @MockitoBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
     @DisplayName("GET /api/hotels/public-list returns active hotel list publicly")
