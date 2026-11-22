@@ -1,6 +1,7 @@
 package com.hotel.backend.controller;
 
 import com.hotel.backend.dto.HotelPublicDto;
+import com.hotel.backend.dto.StaffPresetDto;
 import com.hotel.backend.service.HotelPublicService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,5 +41,16 @@ public class PublicHotelController {
     public ResponseEntity<HotelPublicDto> getPublicHotelById(@PathVariable Long hotelId) {
         HotelPublicDto dto = hotelPublicService.getPublicHotelById(hotelId);
         return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Development/Demo Testing:
+     * Fetch active staff presets (GM, Front Desk, Supervisor, Fulfiller) for a hotel so
+     * newly created hotels and roles immediately render in the testing Quick Access panel.
+     */
+    @GetMapping("/{slug}/public-staff")
+    public ResponseEntity<List<StaffPresetDto>> getPublicStaffPresets(@PathVariable String slug) {
+        List<StaffPresetDto> list = hotelPublicService.getPublicStaffPresets(slug);
+        return ResponseEntity.ok(list);
     }
 }

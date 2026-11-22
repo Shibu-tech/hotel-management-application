@@ -58,6 +58,18 @@ export interface HotelOption {
   id: number;
   name: string;
   slug: string;
+  active?: boolean;
+  gmName?: string | null;
+  gmEmail?: string | null;
+}
+
+export interface ServerStaffPreset {
+  id: number | string;
+  name: string;
+  email: string;
+  role: BackendRole;
+  hotelSlug: string;
+  departmentName?: string | null;
 }
 
 interface QuickFillItem {
@@ -147,6 +159,46 @@ const DEV_BASELINE_ACCOUNTS: QuickFillItem[] =
         icon: Crown,
         accent: 'from-amber-500 to-orange-600',
       },
+      {
+        id: 'dev-adp-hotel-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'adb@gmail.com',
+        pass: 'adp12345',
+        hotelSlug: 'adp-hotel',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
+      {
+        id: 'dev-riku-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'riku.sahu237@gmail.com',
+        pass: 'riku1234',
+        hotelSlug: 'riku',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
+      {
+        id: 'dev-riku-fd',
+        name: 'Front Desk',
+        role: 'FRONT_DESK',
+        email: 'riku.sahu@gmail.com',
+        pass: 'desk123',
+        hotelSlug: 'riku',
+        icon: BellRing,
+        accent: 'from-pink-500 to-rose-600',
+      },
+      {
+        id: 'dev-abc-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'xyz@gmail.com',
+        pass: 'xyz12345',
+        hotelSlug: 'abc',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
     ];
 
 function roleIcon(role: BackendRole): LucideIcon {
@@ -230,6 +282,7 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
   const [selectedHotelSlug, setSelectedHotelSlug] = useState<string>(
     lockedHotel?.slug || 'grand-adp',
   );
+  const [serverStaffPresets, setServerStaffPresets] = useState<ServerStaffPreset[]>([]);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -293,7 +346,33 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
     fetchPublicHotels();
   }, [fetchPublicHotels]);
 
-  // Combine session-created dev accounts + baseline dev accounts scoped to selected hotel (+ Global Admin)
+  // Fetch active staff presets (GM, Front Desk, Supervisor, Fulfiller) for the currently selected hotel
+  useEffect(() => {
+    if (!devQuickAccessEnabled || !selectedHotelSlug) return;
+    let isMounted = true;
+    const fetchStaff = async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/hotels/${encodeURIComponent(selectedHotelSlug)}/public-staff`, {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data: ServerStaffPreset[] = await res.json();
+          if (isMounted && Array.isArray(data)) {
+            setServerStaffPresets(data);
+          }
+        }
+      } catch {
+        // Silently fall back to baseline/stored presets if backend is starting
+      }
+    };
+    fetchStaff();
+    return () => {
+      isMounted = false;
+    };
+  }, [devQuickAccessEnabled, selectedHotelSlug]);
+
+  // Combine session-created dev accounts + server-fetched staff presets + baseline dev accounts scoped to selected hotel (+ Global Admin)
   const visibleQuickAccounts = useMemo<QuickFillItem[]>(() => {
     if (!devQuickAccessEnabled) return [];
 
@@ -306,7 +385,30 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
       }
     }
 
-    // 2. Overlay any in-memory session-created/updated accounts (Admin/GM/Supervisor/Front Desk/Fulfiller)
+    // 2. Add server-fetched staff presets (GM, Front Desk, Supervisor, Fulfiller) for this hotel
+    for (const staff of serverStaffPresets) {
+      const stored = (devQuickAccessEntries as DevQuickAccessEntry[]).find(
+        (e) => e.email.toLowerCase() === staff.email.toLowerCase(),
+      );
+      const baseline = DEV_BASELINE_ACCOUNTS.find(
+        (b) => b.email.toLowerCase() === staff.email.toLowerCase(),
+      );
+
+      byEmail.set(staff.email.toLowerCase(), {
+        id: `server-${staff.id}`,
+        name: staff.name || ROLE_LABELS[staff.role],
+        role: staff.role,
+        email: staff.email,
+        pass: stored?.initialPassword || baseline?.pass || 'password123',
+        hotelSlug: staff.hotelSlug,
+        departmentName: staff.departmentName ?? null,
+        icon: roleIcon(staff.role),
+        accent: roleAccent(staff.role),
+        isSessionCreated: !!stored,
+      });
+    }
+
+    // 3. Overlay any localStorage/session-created accounts (ensuring latest passwords take precedence)
     for (const entry of devQuickAccessEntries as DevQuickAccessEntry[]) {
       const matchesHotel =
         entry.role === 'ADMIN' ||
@@ -338,7 +440,7 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
     };
 
     return Array.from(byEmail.values()).sort((a, b) => order[a.role] - order[b.role]);
-  }, [devQuickAccessEnabled, devQuickAccessEntries, selectedHotelSlug]);
+  }, [devQuickAccessEnabled, devQuickAccessEntries, selectedHotelSlug, serverStaffPresets]);
 
   const handleReset = () => {
     setEmail('');

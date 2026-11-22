@@ -5,18 +5,26 @@ public class HotelPublicDto {
     private String name;
     private String slug;
     private boolean active = true;
+    private String gmName;
+    private String gmEmail;
 
     public HotelPublicDto() {}
 
-    public HotelPublicDto(Long id, String name, String slug, boolean active) {
+    public HotelPublicDto(Long id, String name, String slug, boolean active, String gmName, String gmEmail) {
         this.id = id;
         this.name = name;
         this.slug = slug;
         this.active = active;
+        this.gmName = gmName;
+        this.gmEmail = gmEmail;
+    }
+
+    public HotelPublicDto(Long id, String name, String slug, boolean active) {
+        this(id, name, slug, active, null, null);
     }
 
     public HotelPublicDto(Long id, String name, String slug) {
-        this(id, name, slug, true);
+        this(id, name, slug, true, null, null);
     }
 
     public static Builder builder() {
@@ -28,14 +36,18 @@ public class HotelPublicDto {
         private String name;
         private String slug;
         private boolean active = true;
+        private String gmName;
+        private String gmEmail;
 
         public Builder id(Long id) { this.id = id; return this; }
         public Builder name(String name) { this.name = name; return this; }
         public Builder slug(String slug) { this.slug = slug; return this; }
         public Builder active(boolean active) { this.active = active; return this; }
+        public Builder gmName(String gmName) { this.gmName = gmName; return this; }
+        public Builder gmEmail(String gmEmail) { this.gmEmail = gmEmail; return this; }
 
         public HotelPublicDto build() {
-            return new HotelPublicDto(id, name, slug, active);
+            return new HotelPublicDto(id, name, slug, active, gmName, gmEmail);
         }
     }
 
@@ -50,4 +62,10 @@ public class HotelPublicDto {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public String getGmName() { return gmName; }
+    public void setGmName(String gmName) { this.gmName = gmName; }
+
+    public String getGmEmail() { return gmEmail; }
+    public void setGmEmail(String gmEmail) { this.gmEmail = gmEmail; }
 }
