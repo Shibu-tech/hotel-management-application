@@ -100,6 +100,7 @@ public class SecurityConfig {
                 // Public hotel directory / basic verification endpoints (non-sensitive)
                 .requestMatchers(HttpMethod.GET, "/api/hotels/public-list").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/hotels/*/public").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/hotels/*/public-staff").permitAll()
                 // Platform Admin endpoints strictly protected by ROLE_ADMIN
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // All other endpoints (including /api/auth/me, /logout, /change-password,
