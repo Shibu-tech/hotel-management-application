@@ -44,6 +44,32 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const AUTH_BROADCAST_CHANNEL = 'hotel-auth-session';
+const DEV_QUICK_ACCESS_STORAGE_KEY = 'hotel_dev_quick_access_accounts_v1';
+
+function readStoredDevEntries(): DevQuickAccessEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(DEV_QUICK_ACCESS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredDevEntries(entries: DevQuickAccessEntry[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!entries || entries.length === 0) {
+      window.localStorage.removeItem(DEV_QUICK_ACCESS_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(DEV_QUICK_ACCESS_STORAGE_KEY, JSON.stringify(entries));
+    }
+  } catch {
+    // Ignore environments with restricted storage or quota limits
+  }
+}
 
 function broadcastAuthEvent(type: 'LOGIN' | 'LOGOUT') {
   if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
@@ -59,9 +85,10 @@ function broadcastAuthEvent(type: 'LOGIN' | 'LOGOUT') {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthSessionUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [devEntries, setDevEntries] = useState<DevQuickAccessEntry[]>([]);
-
   const devEnabled = isDevQuickAccessEnabled();
+  const [devEntries, setDevEntries] = useState<DevQuickAccessEntry[]>(() => {
+    return devEnabled ? readStoredDevEntries() : [];
+  });
 
   const refreshSession = useCallback(async () => {
     setLoading(true);
@@ -108,8 +135,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (devEnabled && e.key === DEV_QUICK_ACCESS_STORAGE_KEY) {
+        setDevEntries(readStoredDevEntries());
+      }
+    };
+
     window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('storage', handleStorageChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     let channel: BroadcastChannel | null = null;
@@ -131,12 +165,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('pageshow', handlePageShow);
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('storage', handleStorageChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (channel) {
         channel.close();
       }
     };
-  }, [refreshSession, revalidateSession]);
+  }, [devEnabled, refreshSession, revalidateSession]);
 
   const registerDevQuickAccessEntry = useCallback(
     (entry: Omit<DevQuickAccessEntry, 'id' | 'createdAtLabel'>) => {
@@ -145,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const nowLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setDevEntries((prev) => {
         const filtered = prev.filter((e) => e.email.toLowerCase() !== normalizedEmail);
-        return [
+        const updated: DevQuickAccessEntry[] = [
           {
             ...entry,
             id: `dev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -154,6 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
           ...filtered,
         ];
+        writeStoredDevEntries(updated);
+        return updated;
       });
     },
     [devEnabled],
@@ -161,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearDevQuickAccessEntries = useCallback(() => {
     setDevEntries([]);
+    writeStoredDevEntries([]);
   }, []);
 
   const login = useCallback(

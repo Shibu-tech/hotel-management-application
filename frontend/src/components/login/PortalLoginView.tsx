@@ -806,8 +806,13 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                 </div>
 
                 {visibleQuickAccounts.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-white/15 p-5 text-center text-xs text-slate-400">
-                    No dev accounts cached for <strong>{activeHotelName}</strong> yet. Accounts created by Admin or GM during this session will appear here automatically.
+                  <div className="rounded-xl border border-dashed border-white/15 p-5 text-center text-xs text-slate-400 space-y-1">
+                    <p className="font-semibold text-slate-300">
+                      No saved test credentials for <strong className="text-amber-400">{activeHotelName}</strong> yet.
+                    </p>
+                    <p>
+                      Log in on the left with your GM or staff email & password, or provision accounts in Admin Dashboard. Once logged in, its quick autofill button stays saved here automatically across page refreshes!
+                    </p>
                   </div>
                 ) : (
                   <div id="roleGrid" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
