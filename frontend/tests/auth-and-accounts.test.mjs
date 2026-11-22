@@ -46,10 +46,11 @@ describe('1. Quick Access Feature Flag & Live Rollout Kill-Switch', () => {
     assert.doesNotMatch(authApiSrc, /sessionStorage\.(getItem|setItem|removeItem|clear)/);
   });
 
-  it('authContext.tsx keeps devQuickAccessEntries strictly in React memory (never persisted)', () => {
+  it('authContext.tsx persists devQuickAccessEntries in localStorage for dev testing across page refreshes', () => {
     const authCtxSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/authContext.tsx'), 'utf8');
-    assert.doesNotMatch(authCtxSrc, /localStorage\.(getItem|setItem|removeItem|clear)/);
-    assert.doesNotMatch(authCtxSrc, /sessionStorage\.(getItem|setItem|removeItem|clear)/);
+    assert.match(authCtxSrc, /hotel_dev_quick_access_accounts_v1/);
+    assert.match(authCtxSrc, /localStorage\.getItem/);
+    assert.match(authCtxSrc, /localStorage\.setItem/);
     assert.match(authCtxSrc, /devQuickAccessEntries:\s*devEnabled\s*\?\s*devEntries\s*:\s*\[\]/);
   });
 });
