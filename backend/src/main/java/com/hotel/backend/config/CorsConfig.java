@@ -19,7 +19,7 @@ public class CorsConfig implements WebMvcConfigurer {
     private final List<String> allowedOrigins;
 
     public CorsConfig(
-            @Value("${app.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000}") String originsCsv) {
+            @Value("${app.cors.allowed-origins:http://localhost:3000,http://127.0.0.1:3000,https://*.vercel.app,https://*.netlify.app,https://*.onrender.com}") String originsCsv) {
         this.allowedOrigins = Arrays.stream(originsCsv.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty() && !"*".equals(s))
@@ -29,7 +29,7 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins(allowedOrigins.toArray(new String[0]))
+                .allowedOriginPatterns(allowedOrigins.toArray(new String[0]))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("Content-Type", "Authorization", "Accept", "X-XSRF-TOKEN", "X-Requested-With")
                 .exposedHeaders("Content-Disposition", "Content-Type", "Accept")
@@ -40,7 +40,7 @@ public class CorsConfig implements WebMvcConfigurer {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "Accept", "X-XSRF-TOKEN", "X-Requested-With"));
         configuration.setExposedHeaders(Arrays.asList("Content-Disposition", "Content-Type", "Accept"));
