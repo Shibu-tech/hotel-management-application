@@ -35,6 +35,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<AuthSessionUser>;
   refreshSession: () => Promise<AuthSessionUser | null>;
+  revalidateSession: () => Promise<AuthSessionUser | null>;
   devQuickAccessEnabled: boolean;
   devQuickAccessEntries: DevQuickAccessEntry[];
   registerDevQuickAccessEntry: (entry: Omit<DevQuickAccessEntry, 'id' | 'createdAtLabel'>) => void;
@@ -42,13 +43,52 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const AUTH_BROADCAST_CHANNEL = 'hotel-auth-session';
+const DEV_QUICK_ACCESS_STORAGE_KEY = 'hotel_dev_quick_access_accounts_v1';
+
+function readStoredDevEntries(): DevQuickAccessEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(DEV_QUICK_ACCESS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredDevEntries(entries: DevQuickAccessEntry[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!entries || entries.length === 0) {
+      window.localStorage.removeItem(DEV_QUICK_ACCESS_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(DEV_QUICK_ACCESS_STORAGE_KEY, JSON.stringify(entries));
+    }
+  } catch {
+    // Ignore environments with restricted storage or quota limits
+  }
+}
+
+function broadcastAuthEvent(type: 'LOGIN' | 'LOGOUT') {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+  try {
+    const channel = new BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+    channel.postMessage({ type });
+    channel.close();
+  } catch {
+    // Ignore environments where BroadcastChannel is restricted
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthSessionUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [devEntries, setDevEntries] = useState<DevQuickAccessEntry[]>([]);
-
   const devEnabled = isDevQuickAccessEnabled();
+  const [devEntries, setDevEntries] = useState<DevQuickAccessEntry[]>(() => {
+    return devEnabled ? readStoredDevEntries() : [];
+  });
 
   const refreshSession = useCallback(async () => {
     setLoading(true);
@@ -61,9 +101,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /**
+   * Silent session revalidation against backend /api/auth/me without flashing a full-screen spinner.
+   * Immediately clears user state if the HttpOnly cookie was cleared or revoked (e.g. logout/back navigation).
+   */
+  const revalidateSession = useCallback(async () => {
+    const current = await fetchCurrentSession();
+    setUser(current);
+    return current;
+  }, []);
+
   useEffect(() => {
     refreshSession();
   }, [refreshSession]);
+
+  // Re-verify session on browser bfcache restore (Back/Forward), tab focus, and cross-tab logout
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        void refreshSession();
+      }
+    };
+
+    const handlePopState = () => {
+      void revalidateSession();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void revalidateSession();
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (devEnabled && e.key === DEV_QUICK_ACCESS_STORAGE_KEY) {
+        setDevEntries(readStoredDevEntries());
+      }
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        channel = new BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+        channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+          if (event.data?.type === 'LOGOUT') {
+            setUser(null);
+          } else if (event.data?.type === 'LOGIN') {
+            void revalidateSession();
+          }
+        };
+      } catch {
+        channel = null;
+      }
+    }
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (channel) {
+        channel.close();
+      }
+    };
+  }, [devEnabled, refreshSession, revalidateSession]);
 
   const registerDevQuickAccessEntry = useCallback(
     (entry: Omit<DevQuickAccessEntry, 'id' | 'createdAtLabel'>) => {
@@ -72,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const nowLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setDevEntries((prev) => {
         const filtered = prev.filter((e) => e.email.toLowerCase() !== normalizedEmail);
-        return [
+        const updated: DevQuickAccessEntry[] = [
           {
             ...entry,
             id: `dev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -81,6 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
           ...filtered,
         ];
+        writeStoredDevEntries(updated);
+        return updated;
       });
     },
     [devEnabled],
@@ -88,12 +198,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearDevQuickAccessEntries = useCallback(() => {
     setDevEntries([]);
+    writeStoredDevEntries([]);
   }, []);
 
   const login = useCallback(
     async (email: string, password: string): Promise<AuthSessionUser> => {
       const sessionUser = await loginWithBackend(email, password);
       setUser(sessionUser);
+      broadcastAuthEvent('LOGIN');
       // In development mode, record successfully authenticated session accounts in memory only
       // so developers can switch back to Admin/GM/Staff during the same tab session without storing anything permanently.
       if (devEnabled) {
@@ -115,6 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await logoutFromBackend();
     setUser(null);
+    broadcastAuthEvent('LOGOUT');
   }, []);
 
   const changePassword = useCallback(
@@ -145,6 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       changePassword,
       refreshSession,
+      revalidateSession,
       devQuickAccessEnabled: devEnabled,
       devQuickAccessEntries: devEnabled ? devEntries : [],
       registerDevQuickAccessEntry,
@@ -157,6 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       changePassword,
       refreshSession,
+      revalidateSession,
       devEnabled,
       devEntries,
       registerDevQuickAccessEntry,

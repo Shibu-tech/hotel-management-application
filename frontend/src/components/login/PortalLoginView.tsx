@@ -58,6 +58,18 @@ export interface HotelOption {
   id: number;
   name: string;
   slug: string;
+  active?: boolean;
+  gmName?: string | null;
+  gmEmail?: string | null;
+}
+
+export interface ServerStaffPreset {
+  id: number | string;
+  name: string;
+  email: string;
+  role: BackendRole;
+  hotelSlug: string;
+  departmentName?: string | null;
 }
 
 interface QuickFillItem {
@@ -79,74 +91,115 @@ const DEFAULT_PUBLIC_HOTELS: HotelOption[] = [
 ];
 
 /**
- * Development-stage baseline autofill entries (rendered ONLY when NODE_ENV !== 'production').
+ * Baseline autofill entries for testing/demo Quick Access panel.
+ * Stripped when NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false' (for live hotel rollout).
  * Strictly populates email & password inputs — NEVER bypasses backend BCrypt/JWT authentication.
  */
 const DEV_BASELINE_ACCOUNTS: QuickFillItem[] =
-  process.env.NODE_ENV === 'production'
+  process.env.NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false'
     ? []
     : [
-        {
-          id: 'dev-admin',
-          name: 'Admin',
-          role: 'ADMIN',
-          email: 'admin@thegrandadp.com',
-          pass: 'admin123',
-          hotelSlug: null,
-          icon: ShieldAlert,
-          accent: 'from-purple-500 to-indigo-600',
-        },
-        {
-          id: 'dev-grand-adp-gm',
-          name: 'General Manager',
-          role: 'GENERAL_MANAGER',
-          email: 'gm@thegrandadp.com',
-          pass: 'gm123',
-          hotelSlug: 'grand-adp',
-          icon: Crown,
-          accent: 'from-amber-500 to-orange-600',
-        },
-        {
-          id: 'dev-grand-adp-sup',
-          name: 'Supervisor',
-          role: 'SUPERVISOR',
-          email: 'dispatcher@thegrandadp.com',
-          pass: 'dispatch123',
-          hotelSlug: 'grand-adp',
-          icon: Radio,
-          accent: 'from-sky-500 to-blue-600',
-        },
-        {
-          id: 'dev-grand-adp-fd',
-          name: 'Front Desk',
-          role: 'FRONT_DESK',
-          email: 'frontdesk@thegrandadp.com',
-          pass: 'desk123',
-          hotelSlug: 'grand-adp',
-          icon: BellRing,
-          accent: 'from-pink-500 to-rose-600',
-        },
-        {
-          id: 'dev-grand-adp-ful',
-          name: 'Fulfiller',
-          role: 'FULFILLER',
-          email: 'fulfiller@thegrandadp.com',
-          pass: 'task123',
-          hotelSlug: 'grand-adp',
-          icon: ClipboardCheck,
-          accent: 'from-emerald-500 to-teal-600',
-        },
-        {
-          id: 'dev-mumbai-gm',
-          name: 'General Manager',
-          role: 'GENERAL_MANAGER',
-          email: 'gm.mumbai@thegrandadp.com',
-          pass: 'gm123',
-          hotelSlug: 'palace-mumbai',
-          icon: Crown,
-          accent: 'from-amber-500 to-orange-600',
-        },
-      ];
+      {
+        id: 'dev-admin',
+        name: 'Admin',
+        role: 'ADMIN',
+        email: 'admin@thegrandadp.com',
+        pass: 'admin123',
+        hotelSlug: null,
+        icon: ShieldAlert,
+        accent: 'from-purple-500 to-indigo-600',
+      },
+      {
+        id: 'dev-grand-adp-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'gm@thegrandadp.com',
+        pass: 'gm123',
+        hotelSlug: 'grand-adp',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
+      {
+        id: 'dev-grand-adp-sup',
+        name: 'Supervisor',
+        role: 'SUPERVISOR',
+        email: 'dispatcher@thegrandadp.com',
+        pass: 'dispatch123',
+        hotelSlug: 'grand-adp',
+        icon: Radio,
+        accent: 'from-sky-500 to-blue-600',
+      },
+      {
+        id: 'dev-grand-adp-fd',
+        name: 'Front Desk',
+        role: 'FRONT_DESK',
+        email: 'frontdesk@thegrandadp.com',
+        pass: 'desk123',
+        hotelSlug: 'grand-adp',
+        icon: BellRing,
+        accent: 'from-pink-500 to-rose-600',
+      },
+      {
+        id: 'dev-grand-adp-ful',
+        name: 'Fulfiller',
+        role: 'FULFILLER',
+        email: 'fulfiller@thegrandadp.com',
+        pass: 'task123',
+        hotelSlug: 'grand-adp',
+        icon: ClipboardCheck,
+        accent: 'from-emerald-500 to-teal-600',
+      },
+      {
+        id: 'dev-mumbai-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'gm.mumbai@thegrandadp.com',
+        pass: 'gm123',
+        hotelSlug: 'palace-mumbai',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
+      {
+        id: 'dev-adp-hotel-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'adb@gmail.com',
+        pass: 'adp12345',
+        hotelSlug: 'adp-hotel',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
+      {
+        id: 'dev-riku-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'riku.sahu237@gmail.com',
+        pass: 'riku1234',
+        hotelSlug: 'riku',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
+      {
+        id: 'dev-riku-fd',
+        name: 'Front Desk',
+        role: 'FRONT_DESK',
+        email: 'riku.sahu@gmail.com',
+        pass: 'desk123',
+        hotelSlug: 'riku',
+        icon: BellRing,
+        accent: 'from-pink-500 to-rose-600',
+      },
+      {
+        id: 'dev-abc-gm',
+        name: 'General Manager',
+        role: 'GENERAL_MANAGER',
+        email: 'xyz@gmail.com',
+        pass: 'xyz12345',
+        hotelSlug: 'abc',
+        icon: Crown,
+        accent: 'from-amber-500 to-orange-600',
+      },
+    ];
 
 function roleIcon(role: BackendRole): LucideIcon {
   switch (role) {
@@ -195,11 +248,11 @@ const QUICK_DEPT_OPTIONS: Array<{
   dispatcherDept: DispatcherDepartment;
   icon: LucideIcon;
 }> = [
-  { slug: 'housekeeping', label: 'Housekeeping', dispatcherDept: 'Housekeeping', icon: Sparkles },
-  { slug: 'wellness', label: 'Spa & Wellness', dispatcherDept: 'Wellness', icon: HeartPulse },
-  { slug: 'maintenance', label: 'Maintenance', dispatcherDept: 'Maintenance & Engineering', icon: Wrench },
-  { slug: 'fnb', label: 'Food & Beverages', dispatcherDept: 'Food & Beverages', icon: UtensilsCrossed },
-];
+    { slug: 'housekeeping', label: 'Housekeeping', dispatcherDept: 'Housekeeping', icon: Sparkles },
+    { slug: 'wellness', label: 'Spa & Wellness', dispatcherDept: 'Wellness', icon: HeartPulse },
+    { slug: 'maintenance', label: 'Maintenance', dispatcherDept: 'Maintenance & Engineering', icon: Wrench },
+    { slug: 'fnb', label: 'Food & Beverages', dispatcherDept: 'Food & Beverages', icon: UtensilsCrossed },
+  ];
 
 function deptSlugFromName(name?: string | null): string | null {
   if (!name) return null;
@@ -216,6 +269,8 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
   const { state, setTheme, setPersona, setCurrentHotelSlug, setActiveDispatcherDept } = useDemo();
   const { t } = useI18n();
   const {
+    user: authenticatedUser,
+    loading: authLoading,
     login,
     devQuickAccessEnabled,
     devQuickAccessEntries,
@@ -227,6 +282,7 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
   const [selectedHotelSlug, setSelectedHotelSlug] = useState<string>(
     lockedHotel?.slug || 'grand-adp',
   );
+  const [serverStaffPresets, setServerStaffPresets] = useState<ServerStaffPreset[]>([]);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -290,7 +346,33 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
     fetchPublicHotels();
   }, [fetchPublicHotels]);
 
-  // Combine session-created dev accounts + baseline dev accounts scoped to selected hotel (+ Global Admin)
+  // Fetch active staff presets (GM, Front Desk, Supervisor, Fulfiller) for the currently selected hotel
+  useEffect(() => {
+    if (!devQuickAccessEnabled || !selectedHotelSlug) return;
+    let isMounted = true;
+    const fetchStaff = async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/hotels/${encodeURIComponent(selectedHotelSlug)}/public-staff`, {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data: ServerStaffPreset[] = await res.json();
+          if (isMounted && Array.isArray(data)) {
+            setServerStaffPresets(data);
+          }
+        }
+      } catch {
+        // Silently fall back to baseline/stored presets if backend is starting
+      }
+    };
+    fetchStaff();
+    return () => {
+      isMounted = false;
+    };
+  }, [devQuickAccessEnabled, selectedHotelSlug]);
+
+  // Combine session-created dev accounts + server-fetched staff presets + baseline dev accounts scoped to selected hotel (+ Global Admin)
   const visibleQuickAccounts = useMemo<QuickFillItem[]>(() => {
     if (!devQuickAccessEnabled) return [];
 
@@ -303,7 +385,30 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
       }
     }
 
-    // 2. Overlay any in-memory session-created/updated accounts (Admin/GM/Supervisor/Front Desk/Fulfiller)
+    // 2. Add server-fetched staff presets (GM, Front Desk, Supervisor, Fulfiller) for this hotel
+    for (const staff of serverStaffPresets) {
+      const stored = (devQuickAccessEntries as DevQuickAccessEntry[]).find(
+        (e) => e.email.toLowerCase() === staff.email.toLowerCase(),
+      );
+      const baseline = DEV_BASELINE_ACCOUNTS.find(
+        (b) => b.email.toLowerCase() === staff.email.toLowerCase(),
+      );
+
+      byEmail.set(staff.email.toLowerCase(), {
+        id: `server-${staff.id}`,
+        name: staff.name || ROLE_LABELS[staff.role],
+        role: staff.role,
+        email: staff.email,
+        pass: stored?.initialPassword || baseline?.pass || 'password123',
+        hotelSlug: staff.hotelSlug,
+        departmentName: staff.departmentName ?? null,
+        icon: roleIcon(staff.role),
+        accent: roleAccent(staff.role),
+        isSessionCreated: !!stored,
+      });
+    }
+
+    // 3. Overlay any localStorage/session-created accounts (ensuring latest passwords take precedence)
     for (const entry of devQuickAccessEntries as DevQuickAccessEntry[]) {
       const matchesHotel =
         entry.role === 'ADMIN' ||
@@ -335,7 +440,7 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
     };
 
     return Array.from(byEmail.values()).sort((a, b) => order[a.role] - order[b.role]);
-  }, [devQuickAccessEnabled, devQuickAccessEntries, selectedHotelSlug]);
+  }, [devQuickAccessEnabled, devQuickAccessEntries, selectedHotelSlug, serverStaffPresets]);
 
   const handleReset = () => {
     setEmail('');
@@ -441,7 +546,7 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
       }
 
       setToastMessage(`Authenticated as ${authUser.fullName}. Redirecting...`);
-      router.push(targetUrl);
+      router.replace(targetUrl);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setAuthError(err.message);
@@ -455,14 +560,42 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
     }
   };
 
+  // Prevent already-authenticated users from landing back on /login via browser Back/URL navigation.
+  // Users must explicitly Sign Out from their dashboard to end their session.
+  useEffect(() => {
+    if (authLoading || isSubmitting || !authenticatedUser) return;
+    let target = authenticatedUser.redirectUrl || '/';
+    if (authenticatedUser.role === 'SUPERVISOR' || authenticatedUser.role === 'FULFILLER') {
+      const derivedDept = deptSlugFromName(authenticatedUser.departmentName);
+      if (derivedDept && !target.includes('dept=')) {
+        target = `${target}?dept=${encodeURIComponent(derivedDept)}`;
+      }
+    }
+    router.replace(target);
+  }, [authLoading, isSubmitting, authenticatedUser, router]);
+
   const activeHotelName =
     availableHotels.find((h) => h.slug === selectedHotelSlug)?.name || selectedHotelSlug;
 
+  if (!authLoading && authenticatedUser && !isSubmitting) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center p-6 ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#080d1a] text-slate-100'}`}
+      >
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Lock className="w-7 h-7 text-amber-400" />
+          <p className="text-sm font-medium">
+            Active session detected ({authenticatedUser.email}). Redirecting to your dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 relative overflow-x-hidden portal-login-root ${
-        isLight ? 'bg-slate-100 text-slate-900 light-mode' : 'bg-[#080d1a] text-slate-100 dark-mode'
-      }`}
+      className={`min-h-screen flex flex-col font-sans selection:bg-[#E5C378] selection:text-slate-900 transition-colors duration-300 relative overflow-x-hidden portal-login-root ${isLight ? 'bg-slate-100 text-slate-900 light-mode' : 'bg-[#080d1a] text-slate-100 dark-mode'
+        }`}
       data-theme={state.theme}
     >
       <div className="glow-sphere-1" />
@@ -470,11 +603,10 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
 
       {/* Top Navigation Header */}
       <header
-        className={`relative z-20 px-5 sm:px-10 py-3.5 sm:py-4 flex items-center justify-between portal-login-header ${
-          isLight
+        className={`relative z-20 px-5 sm:px-10 py-3.5 sm:py-4 flex items-center justify-between portal-login-header ${isLight
             ? 'border-b border-slate-200/70 bg-[#ffffff]/80 backdrop-blur-md'
             : 'border-b border-white/10 bg-[#070c17]/80 backdrop-blur-md'
-        }`}
+          }`}
       >
         <Link href="/" className="flex items-center gap-3.5 group">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#dfb96c] to-[#a47b31] text-slate-950 flex items-center justify-center font-bold shadow-sm shadow-amber-900/20 ring-1 ring-amber-300/30">
@@ -493,11 +625,10 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
         <div className="flex items-center gap-2.5">
           <Link
             href="/"
-            className={`hidden sm:inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all portal-header-btn ${
-              isLight
+            className={`hidden sm:inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all portal-header-btn ${isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-400 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-            }`}
+              }`}
           >
             <Globe className="w-4 h-4" />
             <span>{t('nav.publicSite')}</span>
@@ -510,11 +641,10 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
             id="resetDemoBtn"
             onClick={handleReset}
             title="Clear form"
-            className={`inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all cursor-pointer portal-header-btn ${
-              isLight
+            className={`inline-flex items-center gap-2 text-xs sm:text-[13px] px-3.5 py-2 rounded-xl transition-all cursor-pointer portal-header-btn ${isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-400 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-            }`}
+              }`}
           >
             <RotateCcw className="w-4 h-4" />
             <span>{t('common.clear')}</span>
@@ -525,11 +655,10 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
             id="themeToggleBtn"
             onClick={handleToggleTheme}
             aria-label={isLight ? 'Switch to dark theme' : 'Switch to light theme'}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer portal-header-btn ${
-              isLight
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer portal-header-btn ${isLight
                 ? 'text-slate-600 hover:text-slate-900 bg-[#ffffff] border border-slate-200 hover:border-slate-300'
                 : 'text-slate-300 hover:text-white bg-transparent border border-white/10 hover:border-white/20'
-            }`}
+              }`}
           >
             {isLight ? <Sun className="w-4.5 h-4.5 text-amber-500" /> : <Moon className="w-4.5 h-4.5 text-slate-300" />}
           </button>
@@ -542,15 +671,11 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1
-              className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${
-                isLight ? 'text-slate-900' : 'text-white'
-              }`}
+              className={`text-3xl sm:text-4xl font-serif font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'
+                }`}
             >
               Unified Portal Login
             </h1>
-            <p className={`text-xs sm:text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              Sign in with your work email and password. Role &amp; hotel access are verified by the backend.
-            </p>
           </div>
 
           {/* Minimal Hotel Property Toggle Bar (Always visible, reflects newly added hotels) */}
@@ -560,9 +685,8 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
               <span>Hotel</span>
             </div>
             <div
-              className={`flex flex-wrap items-center gap-1 p-1 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${
-                isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
-              }`}
+              className={`flex flex-wrap items-center gap-1 p-1 rounded-2xl border backdrop-blur-md transition-all shadow-xs ${isLight ? 'bg-white border-slate-200/90' : 'bg-[#0c1424]/90 border-white/10'
+                }`}
             >
               {availableHotels.map((hotel) => {
                 const isSelected = selectedHotelSlug === hotel.slug;
@@ -575,13 +699,12 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                       setSelectedQuickId(null);
                     }}
                     aria-pressed={isSelected}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                      isSelected
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${isSelected
                         ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-xs'
                         : isLight
-                        ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
+                          ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
                   >
                     <span>{hotel.name}</span>
                     {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
@@ -603,30 +726,26 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
           {/* LEFT: Clean Login Form Card */}
           <section className={devQuickAccessEnabled ? 'lg:col-span-5 w-full' : 'w-full'}>
             <div
-              className={`rounded-2xl p-6 sm:p-7 backdrop-blur-xl transition-all portal-card-left ${
-                isLight
+              className={`rounded-2xl p-6 sm:p-7 backdrop-blur-xl transition-all portal-card-left ${isLight
                   ? 'bg-[#ffffff]/95 border border-slate-200/80 shadow-xl shadow-slate-900/10'
                   : 'bg-[#0c1424]/90 border border-white/10 shadow-2xl shadow-black/50'
-              }`}
+                }`}
             >
               <div
-                className={`flex items-center justify-between pb-3.5 mb-5 border-b ${
-                  isLight ? 'border-slate-200/60' : 'border-white/5'
-                }`}
+                className={`flex items-center justify-between pb-3.5 mb-5 border-b ${isLight ? 'border-slate-200/60' : 'border-white/5'
+                  }`}
               >
                 <h2
-                  className={`text-xs sm:text-sm font-semibold tracking-wide uppercase ${
-                    isLight ? 'text-slate-500' : 'text-slate-400'
-                  }`}
+                  className={`text-xs sm:text-sm font-semibold tracking-wide uppercase ${isLight ? 'text-slate-500' : 'text-slate-400'
+                    }`}
                 >
                   Sign In
                 </h2>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium ${
-                    isLight
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium ${isLight
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
-                  }`}
+                    }`}
                 >
                   <Lock className="w-3 h-3" />
                   <span>Backend Verified</span>
@@ -635,11 +754,10 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
 
               {lockedHotel && (
                 <div
-                  className={`mb-4 p-3 rounded-xl border flex items-center justify-between gap-2 text-xs ${
-                    isLight
+                  className={`mb-4 p-3 rounded-xl border flex items-center justify-between gap-2 text-xs ${isLight
                       ? 'bg-amber-50 border-amber-200 text-amber-950'
                       : 'bg-amber-950/30 border-amber-500/30 text-amber-200'
-                  }`}
+                    }`}
                 >
                   <span className="font-semibold">{lockedHotel.name}</span>
                   <span className="font-mono text-[11px]">ID #{lockedHotel.id}</span>
@@ -670,9 +788,8 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                 <div>
                   <label
                     htmlFor="emailInput"
-                    className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
-                      isLight ? 'text-slate-500' : 'text-slate-400'
-                    }`}
+                    className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isLight ? 'text-slate-500' : 'text-slate-400'
+                      }`}
                   >
                     Email
                   </label>
@@ -688,11 +805,10 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@hotel-domain.com"
-                      className={`w-full pl-10 pr-4 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all portal-input ${
-                        isLight
+                      className={`w-full pl-10 pr-4 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all portal-input ${isLight
                           ? 'bg-slate-50 text-slate-900 placeholder-slate-400 border border-slate-200'
                           : 'bg-[#070d18] text-white placeholder-slate-500 border border-white/10'
-                      }`}
+                        }`}
                     />
                   </div>
                 </div>
@@ -701,9 +817,8 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                   <div className="flex items-center justify-between mb-1.5">
                     <label
                       htmlFor="passwordInput"
-                      className={`block text-xs font-semibold uppercase tracking-wider ${
-                        isLight ? 'text-slate-500' : 'text-slate-400'
-                      }`}
+                      className={`block text-xs font-semibold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'
+                        }`}
                     >
                       Password
                     </label>
@@ -727,11 +842,10 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className={`w-full pl-10 pr-10 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all portal-input ${
-                        isLight
+                      className={`w-full pl-10 pr-10 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-400/70 focus:border-amber-400 transition-all portal-input ${isLight
                           ? 'bg-slate-50 text-slate-900 placeholder-slate-400 border border-slate-200'
                           : 'bg-[#070d18] text-white placeholder-slate-500 border border-white/10'
-                      }`}
+                        }`}
                     />
                     <button
                       type="button"
@@ -761,19 +875,17 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
           {devQuickAccessEnabled && (
             <section className="lg:col-span-7 w-full" data-testid="dev-quick-access-panel">
               <div
-                className={`rounded-2xl p-6 backdrop-blur-xl border transition-all portal-card-right ${
-                  isLight
+                className={`rounded-2xl p-6 backdrop-blur-xl border transition-all portal-card-right ${isLight
                     ? 'bg-[#ffffff]/90 border-slate-200/80 shadow-sm'
                     : 'bg-[#0c1424]/75 border-white/10 shadow-sm'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <div className="flex items-center gap-2">
                     <FlaskConical className="w-4 h-4 text-amber-400" />
                     <span
-                      className={`text-xs font-bold uppercase tracking-wider ${
-                        isLight ? 'text-slate-700' : 'text-slate-200'
-                      }`}
+                      className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-700' : 'text-slate-200'
+                        }`}
                     >
                       Quick Access (Dev) · {activeHotelName}
                     </span>
@@ -796,8 +908,13 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                 </div>
 
                 {visibleQuickAccounts.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-white/15 p-5 text-center text-xs text-slate-400">
-                    No dev accounts cached for <strong>{activeHotelName}</strong> yet. Accounts created by Admin or GM during this session will appear here automatically.
+                  <div className="rounded-xl border border-dashed border-white/15 p-5 text-center text-xs text-slate-400 space-y-1">
+                    <p className="font-semibold text-slate-300">
+                      No saved test credentials for <strong className="text-amber-400">{activeHotelName}</strong> yet.
+                    </p>
+                    <p>
+                      Log in on the left with your GM or staff email & password, or provision accounts in Admin Dashboard. Once logged in, its quick autofill button stays saved here automatically across page refreshes!
+                    </p>
                   </div>
                 ) : (
                   <div id="roleGrid" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -809,15 +926,14 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                           key={item.id}
                           type="button"
                           onClick={() => handleQuickFill(item)}
-                          className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
-                            isSelected
+                          className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isSelected
                               ? isLight
                                 ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-400/50'
                                 : 'bg-amber-500/10 border-amber-400/60 ring-1 ring-amber-400/30'
                               : isLight
-                              ? 'bg-slate-50/90 hover:bg-white border-slate-200 hover:border-amber-300'
-                              : 'bg-[#070d18]/80 hover:bg-white/[0.04] border-white/10 hover:border-amber-500/40'
-                          }`}
+                                ? 'bg-slate-50/90 hover:bg-white border-slate-200 hover:border-amber-300'
+                                : 'bg-[#070d18]/80 hover:bg-white/[0.04] border-white/10 hover:border-amber-500/40'
+                            }`}
                         >
                           <div
                             className={`w-9 h-9 rounded-lg bg-gradient-to-br ${item.accent} text-white flex items-center justify-center shrink-0 shadow-xs`}
@@ -827,9 +943,8 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-1.5">
                               <span
-                                className={`font-semibold text-xs truncate ${
-                                  isLight ? 'text-slate-900' : 'text-white'
-                                }`}
+                                className={`font-semibold text-xs truncate ${isLight ? 'text-slate-900' : 'text-white'
+                                  }`}
                               >
                                 {item.name}
                               </span>
@@ -870,13 +985,12 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
                             key={dept.slug}
                             type="button"
                             onClick={() => handleSelectQuickDept(dept)}
-                            className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                              active
+                            className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${active
                                 ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-xs'
                                 : isLight
-                                ? 'bg-slate-50 hover:bg-white border-slate-200 text-slate-700'
-                                : 'bg-[#070d18] hover:bg-white/[0.05] border-white/10 text-slate-300'
-                            }`}
+                                  ? 'bg-slate-50 hover:bg-white border-slate-200 text-slate-700'
+                                  : 'bg-[#070d18] hover:bg-white/[0.05] border-white/10 text-slate-300'
+                              }`}
                           >
                             <DeptIcon className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">{dept.label}</span>

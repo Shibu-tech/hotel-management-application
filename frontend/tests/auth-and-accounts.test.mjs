@@ -11,7 +11,7 @@ const FRONTEND_SRC = path.resolve(__dirname, '../src');
 // Mirror of core authApi.ts runtime behavior & direct source contract verification
 // plus live fetch/cookie/CSRF unit tests against authApi.ts & hotelEmployeesApi.ts
 
-describe('1. Development Quick Access Feature Flag & Production Exclusion', () => {
+describe('1. Quick Access Feature Flag & Live Rollout Kill-Switch', () => {
   const origNodeEnv = process.env.NODE_ENV;
   const origFlag = process.env.NEXT_PUBLIC_DEV_QUICK_ACCESS;
 
@@ -24,38 +24,33 @@ describe('1. Development Quick Access Feature Flag & Production Exclusion', () =
     }
   });
 
-  function evaluateDevQuickAccessFlag(nodeEnv, flagValue) {
-    if (nodeEnv === 'production') {
-      return false;
-    }
+  function evaluateDevQuickAccessFlag(flagValue) {
     return flagValue !== 'false';
   }
 
-  it('is strictly disabled in production even if NEXT_PUBLIC_DEV_QUICK_ACCESS is true', () => {
-    assert.equal(evaluateDevQuickAccessFlag('production', 'true'), false);
-    assert.equal(evaluateDevQuickAccessFlag('production', 'false'), false);
-    assert.equal(evaluateDevQuickAccessFlag('production', undefined), false);
+  it('is disabled when NEXT_PUBLIC_DEV_QUICK_ACCESS=false (live hotel rollout switch)', () => {
+    assert.equal(evaluateDevQuickAccessFlag('false'), false);
   });
 
-  it('is enabled in development unless explicitly disabled via NEXT_PUBLIC_DEV_QUICK_ACCESS=false', () => {
-    assert.equal(evaluateDevQuickAccessFlag('development', 'true'), true);
-    assert.equal(evaluateDevQuickAccessFlag('development', undefined), true);
-    assert.equal(evaluateDevQuickAccessFlag('development', 'false'), false);
+  it('is enabled by default for local & staging/demo testing unless disabled via NEXT_PUBLIC_DEV_QUICK_ACCESS=false', () => {
+    assert.equal(evaluateDevQuickAccessFlag('true'), true);
+    assert.equal(evaluateDevQuickAccessFlag(undefined), true);
   });
 
-  it('authApi.ts enforces NODE_ENV === production guard and never stores tokens in localStorage', () => {
+  it('authApi.ts checks NEXT_PUBLIC_DEV_QUICK_ACCESS kill-switch and never stores tokens in localStorage', () => {
     const authApiSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/authApi.ts'), 'utf8');
-    assert.match(authApiSrc, /if\s*\(\s*process\.env\.NODE_ENV\s*===\s*['"]production['"]\s*\)\s*\{\s*return false;/);
+    assert.match(authApiSrc, /return process\.env\.NEXT_PUBLIC_DEV_QUICK_ACCESS !== ['"]false['"];/);
     assert.match(authApiSrc, /credentials:\s*['"]include['"]/);
     assert.match(authApiSrc, /X-XSRF-TOKEN/);
     assert.doesNotMatch(authApiSrc, /localStorage\.(getItem|setItem|removeItem|clear)/);
     assert.doesNotMatch(authApiSrc, /sessionStorage\.(getItem|setItem|removeItem|clear)/);
   });
 
-  it('authContext.tsx keeps devQuickAccessEntries strictly in React memory (never persisted)', () => {
+  it('authContext.tsx persists devQuickAccessEntries in localStorage for dev testing across page refreshes', () => {
     const authCtxSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/authContext.tsx'), 'utf8');
-    assert.doesNotMatch(authCtxSrc, /localStorage\.(getItem|setItem|removeItem|clear)/);
-    assert.doesNotMatch(authCtxSrc, /sessionStorage\.(getItem|setItem|removeItem|clear)/);
+    assert.match(authCtxSrc, /hotel_dev_quick_access_accounts_v1/);
+    assert.match(authCtxSrc, /localStorage\.getItem/);
+    assert.match(authCtxSrc, /localStorage\.setItem/);
     assert.match(authCtxSrc, /devQuickAccessEntries:\s*devEnabled\s*\?\s*devEntries\s*:\s*\[\]/);
   });
 });
@@ -66,11 +61,11 @@ describe('2. Login Page Security, Autofill & No Offline Auth Bypass', () => {
     'utf8',
   );
 
-  it('removes offline auth bypass, substring role inference, and localStorage token storage, and strips baseline entries in production', () => {
+  it('removes offline auth bypass, substring role inference, and localStorage token storage, and strips baseline entries when NEXT_PUBLIC_DEV_QUICK_ACCESS=false', () => {
     assert.doesNotMatch(loginSrc, /handleOfflineFallback/);
     assert.doesNotMatch(loginSrc, /localStorage\.setItem\(['"]authToken/);
     assert.doesNotMatch(loginSrc, /cleanEmail\.includes\(['"]admin['"]\)/);
-    assert.match(loginSrc, /process\.env\.NODE_ENV === 'production'\s*\?\s*\[\]/);
+    assert.match(loginSrc, /process\.env\.NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false'\s*\?\s*\[\]/);
   });
 
   it('DEV QUICK ACCESS autofills email & password ONLY and never auto-submits', () => {
@@ -84,9 +79,10 @@ describe('2. Login Page Security, Autofill & No Offline Auth Bypass', () => {
     assert.doesNotMatch(autofillMatch[0], /router\.push/);
   });
 
-  it('redirects strictly using backend-supplied redirectUrl and fails closed when backend is unreachable', () => {
+  it('redirects strictly using backend-supplied redirectUrl with router.replace and fails closed when backend is unreachable', () => {
     assert.match(loginSrc, /authUser\.redirectUrl/);
-    assert.match(loginSrc, /router\.push\(targetUrl\)/);
+    assert.match(loginSrc, /router\.replace\(targetUrl\)/);
+    assert.doesNotMatch(loginSrc, /router\.push\(targetUrl\)/);
     assert.match(loginSrc, /Authentication server is unreachable/);
   });
 });
@@ -251,5 +247,109 @@ describe('4. StaffRosterTab & Admin Dashboard Real API Wiring & Route Protection
       'utf8',
     );
     assert.match(legacyStaffSrc, /redirect\(['"]\/login['"]\)/);
+  });
+});
+
+describe('5. Production API URL Normalization & Same-Origin Vercel Rewrite Proxy', () => {
+  const origApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const origWindow = globalThis.window;
+
+  afterEach(() => {
+    if (origApiUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_API_URL;
+    } else {
+      process.env.NEXT_PUBLIC_API_URL = origApiUrl;
+    }
+    if (origWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = origWindow;
+    }
+  });
+
+  it('normalizes NEXT_PUBLIC_API_URL to always include /api without duplication', async () => {
+    const { normalizeApiBaseUrl } = await import('../src/lib/authApi.ts');
+    assert.equal(
+      normalizeApiBaseUrl('https://hotel-management-application-4v49.onrender.com'),
+      'https://hotel-management-application-4v49.onrender.com/api',
+    );
+    assert.equal(
+      normalizeApiBaseUrl('https://hotel-management-application-4v49.onrender.com/'),
+      'https://hotel-management-application-4v49.onrender.com/api',
+    );
+    assert.equal(
+      normalizeApiBaseUrl('https://hotel-management-application-4v49.onrender.com/api/'),
+      'https://hotel-management-application-4v49.onrender.com/api',
+    );
+    assert.equal(normalizeApiBaseUrl('/api'), '/api');
+    assert.equal(normalizeApiBaseUrl(''), 'http://localhost:8080/api');
+  });
+
+  it('uses same-origin /api proxy on HTTPS cross-origin deployments (Vercel -> Render) and normalized direct URL on localhost', async () => {
+    const { getApiBaseUrl } = await import('../src/lib/authApi.ts');
+
+    process.env.NEXT_PUBLIC_API_URL = 'https://hotel-management-application-4v49.onrender.com';
+    globalThis.window = {
+      location: {
+        protocol: 'https:',
+        origin: 'https://hotel-management-application-seven.vercel.app',
+      },
+    };
+    assert.equal(getApiBaseUrl(), '/api');
+
+    globalThis.window = {
+      location: {
+        protocol: 'http:',
+        origin: 'http://localhost:3000',
+      },
+    };
+    assert.equal(getApiBaseUrl(), 'https://hotel-management-application-4v49.onrender.com/api');
+  });
+
+  it('next.config.mjs defines /api/:path* rewrite for production cookie & CSRF compatibility', () => {
+    const nextConfigSrc = fs.readFileSync(path.resolve(__dirname, '../next.config.mjs'), 'utf8');
+    assert.match(nextConfigSrc, /async rewrites\(\)/);
+    assert.match(nextConfigSrc, /source:\s*['"]\/api\/:path\*['"]/);
+  });
+});
+
+describe('6. Browser Back/Forward Navigation, Logout Revocation & bfcache Hardening', () => {
+  it('PortalLoginView blocks already-authenticated users from landing on /login and replaces history on login', () => {
+    const loginSrc = fs.readFileSync(
+      path.join(FRONTEND_SRC, 'components/login/PortalLoginView.tsx'),
+      'utf8',
+    );
+    assert.match(loginSrc, /user:\s*authenticatedUser/);
+    assert.match(loginSrc, /if\s*\(!authLoading\s*&&\s*authenticatedUser\s*&&\s*!isSubmitting\)/);
+    assert.match(loginSrc, /router\.replace\(target\)/);
+    assert.match(loginSrc, /router\.replace\(targetUrl\)/);
+  });
+
+  it('FulfillerProfileTab revokes backend session via await logout() and uses router.replace(/login)', () => {
+    const fulfillerSrc = fs.readFileSync(
+      path.join(FRONTEND_SRC, 'components/staff/fulfiller/FulfillerProfileTab.tsx'),
+      'utf8',
+    );
+    assert.match(fulfillerSrc, /const\s*\{\s*logout\s*\}\s*=\s*useAuth\(\)/);
+    assert.match(fulfillerSrc, /await logout\(\)/);
+    assert.match(fulfillerSrc, /router\.replace\(['"]\/login['"]\)/);
+    assert.doesNotMatch(fulfillerSrc, /router\.push\(['"]\/login['"]\)/);
+  });
+
+  it('AuthProvider revalidates sessions on bfcache pageshow/popstate and syncs logout across tabs', () => {
+    const authCtxSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/authContext.tsx'), 'utf8');
+    assert.match(authCtxSrc, /window\.addEventListener\(['"]pageshow['"]/);
+    assert.match(authCtxSrc, /event\.persisted/);
+    assert.match(authCtxSrc, /window\.addEventListener\(['"]popstate['"]/);
+    assert.match(authCtxSrc, /BroadcastChannel/);
+    assert.match(authCtxSrc, /broadcastAuthEvent\(['"]LOGOUT['"]\)/);
+  });
+
+  it('next.config.mjs sends Cache-Control: no-store headers on protected routes and /login', () => {
+    const nextConfigSrc = fs.readFileSync(path.resolve(__dirname, '../next.config.mjs'), 'utf8');
+    assert.match(nextConfigSrc, /async headers\(\)/);
+    assert.match(nextConfigSrc, /no-store, no-cache, must-revalidate, private/);
+    assert.match(nextConfigSrc, /source:\s*['"]\/admin\/:path\*['"]/);
+    assert.match(nextConfigSrc, /source:\s*['"]\/hotel\/:path\*['"]/);
   });
 });

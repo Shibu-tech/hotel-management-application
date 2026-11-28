@@ -38,21 +38,50 @@ export class ApiError extends Error {
   }
 }
 
+export function normalizeApiBaseUrl(raw?: string): string {
+  const trimmed = (raw || '').trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    return 'http://localhost:8080/api';
+  }
+  if (/\/api$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+}
+
 export function getApiBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
-  const trimmed = raw.replace(/\/+$/, '');
-  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+  const configured = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+  const normalized = normalizeApiBaseUrl(configured);
+
+  // In HTTPS deployments (e.g., Vercel frontend + Render backend), proxy cross-origin
+  // requests through Next.js same-origin `/api/*` rewrites so HttpOnly auth cookies and
+  // Double-Submit XSRF-TOKEN cookies stay first-party across all browsers.
+  if (
+    configured &&
+    typeof window !== 'undefined' &&
+    window.location?.protocol === 'https:' &&
+    /^https?:\/\//i.test(normalized)
+  ) {
+    try {
+      const apiOrigin = new URL(normalized).origin;
+      if (apiOrigin !== window.location.origin) {
+        return '/api';
+      }
+    } catch {
+      // Fall back to normalized URL if parsing fails
+    }
+  }
+
+  return normalized;
 }
 
 /**
- * Strictly development-only feature flag.
- * Guaranteed false in production builds (NODE_ENV === 'production').
- * Enabled by default in local development unless NEXT_PUBLIC_DEV_QUICK_ACCESS === 'false'.
+ * Testing/demo Quick Access autofill panel flag.
+ * Enabled by default while testing (both local and Vercel deployments).
+ * Set NEXT_PUBLIC_DEV_QUICK_ACCESS=false before live hotel rollout to hide it completely.
+ * NOTE: Quick Access ONLY autofills email & password inputs — all logins still go through full backend auth.
  */
 export function isDevQuickAccessEnabled(): boolean {
-  if (process.env.NODE_ENV === 'production') {
-    return false;
-  }
   return process.env.NEXT_PUBLIC_DEV_QUICK_ACCESS !== 'false';
 }
 
