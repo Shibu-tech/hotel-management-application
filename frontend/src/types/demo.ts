@@ -1286,6 +1286,10 @@ export interface CustomRoomSpec {
   guestPhone?: string;
   guestEmail?: string;
   bookingRef?: string;
+  checkInDate?: string;
+  checkOutDate?: string;
+  duration?: string;
+  guestsCount?: number;
   vip?: boolean;
   vipTier?: string;
   preferences?: string;

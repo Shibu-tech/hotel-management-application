@@ -24,11 +24,19 @@ export interface PassCredentials {
 }
 
 export function passCredentials(stay: StayRecord): PassCredentials {
+  const hasRegisteredContact = Boolean(stay.guestEmail || stay.guestPhone);
+  if (hasRegisteredContact) {
+    return {
+      email: stay.guestEmail || 'Not registered',
+      phone: stay.guestPhone || 'Not registered',
+      pin: stay.accessPin ?? String(1000 + (hash(`${stay.id}:pin`) % 9000)),
+    };
+  }
   const n = 9000000000 + (hash(`${stay.id}:phone`) % 999999999);
   const digits = String(n);
   return {
-    email: stay.guestEmail ?? `${slug(stay.guest)}@example.com`,
-    phone: stay.guestPhone ?? `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`,
+    email: `${slug(stay.guest)}@example.com`,
+    phone: `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`,
     pin: stay.accessPin ?? String(1000 + (hash(`${stay.id}:pin`) % 9000)),
   };
 }

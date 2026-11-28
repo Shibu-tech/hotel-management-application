@@ -53,6 +53,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(jwt) && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 Claims claims = jwtUtil.extractAllClaims(jwt);
+                if (jwtUtil.isGuestToken(claims)) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 String email = claims.getSubject();
                 Long tokenVersion = jwtUtil.extractTokenVersion(claims);
 

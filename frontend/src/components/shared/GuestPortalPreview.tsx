@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -38,6 +38,11 @@ import { guests } from '@/lib/mockData';
 import { useDemo } from '@/lib/store';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import {
+  fetchGuestSession,
+  logoutGuestPortalSession,
+  type GuestSessionInfo,
+} from '@/lib/guestAuthApi';
 
 /** The 5 navigation sections */
 const NAV: { id: GuestMainSection; label: string; icon: LucideIcon }[] = [
@@ -72,11 +77,91 @@ const NAV_MAP: Record<string, GuestMainSection> = {
   folio: 'profile',
 };
 
-export function GuestPortalPreview({ room, token }: { room: string; token: string }) {
+export function GuestPortalPreview({
+  room: propRoom,
+  token,
+  hotelSlug,
+}: {
+  room: string;
+  token: string;
+  hotelSlug?: string;
+}) {
   const router = useRouter();
-  const { state, setTheme, setGuestThemeOption } = useDemo();
+  const { state, setTheme, setGuestThemeOption, setCurrentHotelSlug, currentHotelName } = useDemo();
   const guestThemeOption = state.guestThemeOption || 'classic';
   const { t } = useI18n();
+  const isAuthenticatedGuestRoute = Boolean(hotelSlug);
+  const [sessionState, setSessionState] = useState<'loading' | 'active' | 'revoked' | 'none'>(
+    isAuthenticatedGuestRoute ? 'loading' : 'none',
+  );
+  const [activeSession, setActiveSession] = useState<GuestSessionInfo | null>(null);
+  const [revocationMessage, setRevocationMessage] = useState<string>('');
+  const sessionVerifiedRef = useRef(false);
+  const lastHotelIdRef = useRef<number | null>(null);
+
+  const verifyGuestSession = useCallback(async () => {
+    if (!isAuthenticatedGuestRoute) return;
+    const res = await fetchGuestSession();
+    if (res.status === 'active') {
+      if (hotelSlug && res.session.hotelSlug !== hotelSlug) {
+        sessionVerifiedRef.current = false;
+        setActiveSession(null);
+        setRevocationMessage(
+          'Your active room session belongs to another property. Please scan this hotel’s QR code.',
+        );
+        setSessionState('revoked');
+        return;
+      }
+      lastHotelIdRef.current = res.session.hotelId;
+      sessionVerifiedRef.current = true;
+      setActiveSession(res.session);
+      setRevocationMessage('');
+      setSessionState('active');
+      return;
+    }
+    if (res.status === 'revoked') {
+      sessionVerifiedRef.current = false;
+      setActiveSession(null);
+      setRevocationMessage(res.message);
+      setSessionState('revoked');
+      return;
+    }
+    if (!sessionVerifiedRef.current) {
+      setRevocationMessage('Unable to verify your stay session. Please scan the hotel QR code again.');
+      setSessionState('revoked');
+    }
+  }, [isAuthenticatedGuestRoute, hotelSlug]);
+
+  useEffect(() => {
+    if (!isAuthenticatedGuestRoute) return;
+    void verifyGuestSession();
+    const onFocus = () => {
+      void verifyGuestSession();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void verifyGuestSession();
+      }
+    };
+    const interval = window.setInterval(() => {
+      void verifyGuestSession();
+    }, 15_000);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [isAuthenticatedGuestRoute, verifyGuestSession]);
+
+  useEffect(() => {
+    if (activeSession?.hotelSlug) {
+      setCurrentHotelSlug(activeSession.hotelSlug, activeSession.hotelName);
+    }
+  }, [activeSession?.hotelSlug, activeSession?.hotelName, setCurrentHotelSlug]);
+
+  const room = activeSession?.roomNumber || propRoom || (isAuthenticatedGuestRoute ? '' : '402');
 
   const getNavLabel = (id: GuestMainSection) => {
     switch (id) {
@@ -102,11 +187,27 @@ export function GuestPortalPreview({ room, token }: { room: string; token: strin
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const stay = (state.frontDesk?.stays ?? []).find((st) => st.room === room && st.status === 'in_house');
-  const guest =
-    guests.find((g) => g.room === room) ??
-    (stay ? { room: stay.room, name: stay.guest, checkout: stay.departure } : undefined);
-  const revoked = (state.revokedRooms ?? []).includes(room);
-  const valid = Boolean(guest) && token === 'demo-token' && !revoked;
+  const guest = activeSession
+    ? {
+        room: activeSession.roomNumber,
+        name: activeSession.guestName,
+        checkout: activeSession.checkOutDate || 'Today',
+      }
+    : !isAuthenticatedGuestRoute
+      ? guests.find((g) => g.room === room) ??
+        (stay ? { room: stay.room, name: stay.guest, checkout: stay.departure } : undefined)
+      : undefined;
+  const localRevoked = Boolean(room) && (state.revokedRooms ?? []).includes(room);
+  const roomMismatch = Boolean(
+    isAuthenticatedGuestRoute &&
+      propRoom &&
+      activeSession &&
+      activeSession.roomNumber !== propRoom,
+  );
+  const revoked = sessionState === 'revoked' || localRevoked;
+  const valid = isAuthenticatedGuestRoute
+    ? sessionState === 'active' && !roomMismatch && Boolean(activeSession) && !localRevoked
+    : Boolean(guest) && token === 'demo-token' && !localRevoked;
   const isLight = state.theme === 'light';
 
   // Listen for custom open-guest-tour event
@@ -185,6 +286,8 @@ export function GuestPortalPreview({ room, token }: { room: string; token: strin
     ? {
         room,
         guestName: guest.name,
+        guestEmail: activeSession?.guestEmail ?? stay?.guestEmail ?? null,
+        guestPhone: activeSession?.guestPhone ?? stay?.guestPhone ?? null,
         onNavigate: handleNavigate,
         initialSubtab: subtab,
       }
@@ -197,23 +300,51 @@ export function GuestPortalPreview({ room, token }: { room: string; token: strin
       {guestThemeOption === 'emerald' && <BotanicalBackground />}
       {guestThemeOption === 'burgundy' && <LuxuryBotanicalBackground />}
       <div className="guest-frame guest-shell w-full max-w-full overflow-x-hidden box-border relative z-10">
-        {!valid || !guest || !tabProps ? (
+        {isAuthenticatedGuestRoute && sessionState === 'loading' ? (
+          <div className="flex flex-1 flex-col items-center justify-center px-8 text-center min-h-[500px]">
+            <div className="h-10 w-10 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin" />
+            <p className="mt-4 text-sm font-semibold">Verifying room portal access...</p>
+            <p className="guest-muted mt-1 text-xs">Checking active stay registration with Front Desk</p>
+          </div>
+        ) : !valid || !guest || !tabProps ? (
           <div className="flex flex-1 flex-col items-center justify-center px-8 text-center min-h-[500px]">
             <span className="grid h-14 w-14 place-items-center rounded-2xl border border-rose-400/30 bg-rose-500/10 text-rose-500">
               <ShieldOff className="h-7 w-7" aria-hidden />
             </span>
-            <h1 className="mt-4 text-xl font-bold">{revoked ? 'QR session ended' : 'Invalid QR link'}</h1>
+            <h1 className="mt-4 text-xl font-bold">
+              {roomMismatch
+                ? 'Room mismatch'
+                : revoked
+                  ? 'QR session ended'
+                  : 'Invalid QR link'}
+            </h1>
             <p className="guest-muted mt-2 max-w-xs text-sm">
-              {revoked
-                ? 'This room session ended after checkout or a room move. Ask Front Desk for a new code.'
-                : 'This link does not match a verified stay. Scan the code in your room.'}
+              {roomMismatch && activeSession
+                ? `Your stay is registered to Room ${activeSession.roomNumber}, not Room ${propRoom}.`
+                : revoked
+                  ? revocationMessage ||
+                    'This room session ended after checkout or a room move. Ask Front Desk for a new code.'
+                  : 'This link does not match a verified stay. Scan the QR code with your registered phone number or email.'}
             </p>
             <div className="mt-4">
-              <GuestPill tone={revoked ? 'warning' : 'danger'}>{revoked ? 'Session ended' : 'Not verified'}</GuestPill>
+              <GuestPill tone={roomMismatch || revoked ? 'warning' : 'danger'}>
+                {roomMismatch ? 'Wrong Room' : revoked ? 'Session ended' : 'Not verified'}
+              </GuestPill>
             </div>
-            <Link href="/" className="btn btn-accent btn-md mt-6">
-              Back to demo home
-            </Link>
+            {roomMismatch && activeSession ? (
+              <Link href={activeSession.redirectUrl} className="btn btn-accent btn-md mt-6">
+                Open Room {activeSession.roomNumber} Portal
+              </Link>
+            ) : (
+              <Link
+                href={lastHotelIdRef.current ? `/${lastHotelIdRef.current}` : '/'}
+                className="btn btn-accent btn-md mt-6"
+              >
+                {isAuthenticatedGuestRoute && lastHotelIdRef.current
+                  ? 'Scan QR / Sign in again'
+                  : 'Back to home'}
+              </Link>
+            )}
           </div>
         ) : (
           <>
@@ -238,10 +369,10 @@ export function GuestPortalPreview({ room, token }: { room: string; token: strin
                 >
                   <div className="flex items-center gap-2">
                     <span className="block truncate text-xs sm:text-sm lg:text-base font-black tracking-tight text-white hover:text-amber-300 transition-colors">
-                      The Grand ADP
+                      {activeSession?.hotelName || currentHotelName || 'The Grand ADP'}
                     </span>
                     <span className="hidden sm:inline-block text-[10px] sm:text-xs text-amber-400 font-mono font-semibold uppercase tracking-wider">
-                      Resort &amp; Suites
+                      {isAuthenticatedGuestRoute ? 'Room Guest Portal' : 'Resort & Suites'}
                     </span>
                   </div>
                   <span className="guest-muted flex items-center gap-1.5 text-[10px] sm:text-xs">
@@ -409,10 +540,21 @@ export function GuestPortalPreview({ room, token }: { room: string; token: strin
         {logoutOpen && (
           <GuestConfirm
             title="Log out of the guest portal?"
-            body="You'll return to the demo home page. Your requests, messages and folio stay saved."
+            body={
+              isAuthenticatedGuestRoute
+                ? 'You will be signed out of this room portal. Scan the hotel QR code with your phone or email to enter again.'
+                : "You'll return to the demo home page. Your requests, messages and folio stay saved."
+            }
             confirmLabel="Log out"
             onCancel={() => setLogoutOpen(false)}
-            onConfirm={() => router.push('/')}
+            onConfirm={async () => {
+              const backTarget = lastHotelIdRef.current ? `/${lastHotelIdRef.current}` : '/';
+              if (isAuthenticatedGuestRoute) {
+                await logoutGuestPortalSession();
+              }
+              setLogoutOpen(false);
+              router.push(backTarget);
+            }}
           />
         )}
 
@@ -466,6 +608,8 @@ function TabPanel({
   tabProps: {
     room: string;
     guestName: string;
+    guestEmail?: string | null;
+    guestPhone?: string | null;
     onNavigate: (t: GuestTabId, subtab?: string) => void;
     initialSubtab?: string;
   };

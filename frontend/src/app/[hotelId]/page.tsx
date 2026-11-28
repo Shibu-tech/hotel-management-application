@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Home,
 } from 'lucide-react';
-import { PortalLoginView, LockedHotelInfo } from '@/components/login/PortalLoginView';
+import { GuestQrLoginView } from '@/components/login/GuestQrLoginView';
+import type { LockedHotelInfo } from '@/components/login/PortalLoginView';
 import { getApiBaseUrl } from '@/lib/authApi';
 
 export default function HotelGuestScanPage() {
@@ -185,6 +186,6 @@ export default function HotelGuestScanPage() {
     );
   }
 
-  // Valid & Active Hotel: render hotel-specific login portal
-  return <PortalLoginView lockedHotel={hotel!} />;
+  // Valid & Active Hotel: render minimal passwordless Guest QR login portal
+  return <GuestQrLoginView hotel={hotel!} />;
 }

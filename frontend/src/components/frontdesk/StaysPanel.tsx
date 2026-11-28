@@ -10,6 +10,8 @@ import {
   Folder,
   LogIn,
   LogOut,
+  Mail,
+  Phone,
   Plus,
   Search,
   ShieldCheck,
@@ -23,6 +25,13 @@ import { Panel } from '@/components/ui/Panel';
 import { FieldLabel, Modal } from '@/components/frontdesk/Modal';
 import { LivePassDialog } from '@/components/frontdesk/LivePassDialog';
 import { READINESS_TONE } from '@/components/frontdesk/RoomsPanel';
+import { ApiError } from '@/lib/authApi';
+import {
+  checkInHotelStay,
+  checkOutHotelStay,
+  moveHotelStay,
+  syncHotelStay,
+} from '@/lib/hotelStaysApi';
 import {
   READINESS_LABEL,
   addStay,
@@ -38,6 +47,7 @@ import {
   openDisputeCount,
   settleBalance,
   stayBalance,
+  validateStayContact,
   type StayCategory,
 } from '@/lib/frontDesk';
 import { DEMO_TODAY, fmtDay, parseDemoDay } from '@/lib/bookings';
@@ -68,10 +78,11 @@ const isDepartingToday = (st: StayRecord) => st.status === 'in_house' && (Boolea
 const idIsVerified = (st: StayRecord) => st.idChecked || st.idVerificationStatus === 'verified';
 
 export function StaysPanel({ initialFilter = 'all' }: { initialFilter?: Filter }) {
-  const { state, fdAction } = useDemo();
+  const { state, fdAction, currentHotelSlug, notify } = useDemo();
   const [filter, setFilter] = useState<Filter>(initialFilter);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [busyStayAction, setBusyStayAction] = useState(false);
 
   useEffect(() => {
     if (initialFilter) setFilter(initialFilter);
@@ -163,19 +174,55 @@ export function StaysPanel({ initialFilter = 'all' }: { initialFilter?: Filter }
       {dialog?.kind === 'checkout' && dialogStay && (
         <CheckoutDialog
           stay={dialogStay}
+          busy={busyStayAction}
           onClose={() => setDialog(null)}
           onSettle={() => fdAction((s) => settleBalance(s, dialogStay.id))}
-          onCheckout={() => {
-            if (!fdAction((s) => checkOut(s, dialogStay.id))) setDialog(null);
+          onCheckout={async () => {
+            if (checkoutBlockers(state, dialogStay).length > 0) return;
+            setBusyStayAction(true);
+            try {
+              if (currentHotelSlug) {
+                await checkOutHotelStay(currentHotelSlug, dialogStay.room);
+              }
+              if (!fdAction((s) => checkOut(s, dialogStay.id))) setDialog(null);
+            } catch (err: unknown) {
+              notify(err instanceof ApiError || err instanceof Error ? err.message : 'Checkout failed on server.');
+            } finally {
+              setBusyStayAction(false);
+            }
           }}
         />
       )}
       {dialog?.kind === 'move' && dialogStay && (
         <MoveDialog
           stay={dialogStay}
+          busy={busyStayAction}
           onClose={() => setDialog(null)}
-          onConfirm={(toRoom, reason, roomType) => {
-            if (!fdAction((s) => moveRoom(s, dialogStay.id, toRoom, reason, roomType))) setDialog(null);
+          onConfirm={async (toRoom, reason, roomType) => {
+            if (reason.trim().length < 3 || !toRoom) return;
+            setBusyStayAction(true);
+            try {
+              if (currentHotelSlug) {
+                const targetRoomObj = (state.frontDesk?.rooms ?? []).find((r) => r.no === toRoom);
+                await moveHotelStay(currentHotelSlug, {
+                  fromRoomNumber: dialogStay.room,
+                  toRoomNumber: toRoom,
+                  toFloor: targetRoomObj?.floor,
+                  toTypeFull: roomType,
+                  guestName: dialogStay.guest,
+                  guestEmail: dialogStay.guestEmail,
+                  guestPhone: dialogStay.guestPhone,
+                  checkInDate: dialogStay.arrival,
+                  checkOutDate: dialogStay.departure,
+                  vip: Boolean(dialogStay.vip),
+                });
+              }
+              if (!fdAction((s) => moveRoom(s, dialogStay.id, toRoom, reason, roomType))) setDialog(null);
+            } catch (err: unknown) {
+              notify(err instanceof ApiError || err instanceof Error ? err.message : 'Room move failed on server.');
+            } finally {
+              setBusyStayAction(false);
+            }
           }}
         />
       )}
@@ -200,8 +247,9 @@ function checkInHint(stay: StayRecord, room: RoomRecord | undefined, blocker: st
 }
 
 function StayRow({ stay, onDialog }: { stay: StayRecord; onDialog: (kind: 'verify' | 'checkout' | 'move' | 'livepass') => void }) {
-  const { state, fdAction } = useDemo();
+  const { state, fdAction, currentHotelSlug, notify } = useDemo();
   const [cleanerAssigned, setCleanerAssigned] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
   const room = (state.frontDesk?.rooms ?? []).find((r) => r.no === stay.room);
   const arriving = stay.status === 'expected';
   const blocker = arriving ? checkInBlocker(state, stay) : null;
@@ -210,6 +258,36 @@ function StayRow({ stay, onDialog }: { stay: StayRecord; onDialog: (kind: 'verif
   const balance = stayBalance(state, stay);
   const early = stay.earlyCheckIn && stay.earlyCheckIn.status !== 'declined' ? stay.earlyCheckIn : undefined;
   const verified = idIsVerified(stay);
+
+  async function handleCheckInClick() {
+    if (blocker !== null || checkingIn) return;
+    setCheckingIn(true);
+    try {
+      if (currentHotelSlug) {
+        if (!stay.guestEmail && !stay.guestPhone) {
+          await checkInHotelStay(currentHotelSlug, stay.room);
+        } else {
+          // Ensure room & contact exist on backend before checking in
+          await syncHotelStay(currentHotelSlug, {
+            roomNumber: stay.room,
+            floor: room?.floor,
+            typeFull: stay.roomType,
+            guestName: stay.guest,
+            guestEmail: stay.guestEmail,
+            guestPhone: stay.guestPhone,
+            category: 'in_house',
+            bookingRef: stay.bookingRef,
+            vip: Boolean(stay.vip),
+          });
+        }
+      }
+      fdAction((s) => checkIn(s, stay.id));
+    } catch (err: unknown) {
+      notify(err instanceof ApiError || err instanceof Error ? err.message : 'Unable to check in on server.');
+    } finally {
+      setCheckingIn(false);
+    }
+  }
 
   return (
     <li className="work-row" data-priority={stay.vip ? 'vip' : 'normal'}>
@@ -224,6 +302,22 @@ function StayRow({ stay, onDialog }: { stay: StayRecord; onDialog: (kind: 'verif
             {arriving ? `Arrives ${stay.arrival}` : stay.status === 'in_house' ? `Departs ${stay.departure}` : `Left ${stay.departure}`}
             {stay.movedFrom ? ` · Moved from ${stay.movedFrom}` : ''}
           </p>
+          {(stay.guestPhone || stay.guestEmail) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mist-300">
+              {stay.guestPhone && (
+                <span className="inline-flex items-center gap-1">
+                  <Phone className="h-3 w-3 text-cyan-400" aria-hidden />
+                  <span>{stay.guestPhone}</span>
+                </span>
+              )}
+              {stay.guestEmail && (
+                <span className="inline-flex items-center gap-1">
+                  <Mail className="h-3 w-3 text-amber-400" aria-hidden />
+                  <span className="truncate">{stay.guestEmail}</span>
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {arriving && (
@@ -241,11 +335,12 @@ function StayRow({ stay, onDialog }: { stay: StayRecord; onDialog: (kind: 'verif
               <>
                 {isDepartingToday(stay) && <Badge tone="warning">Departing Today</Badge>}
                 <Badge tone={balance > 0 ? 'warning' : 'success'}>{balance > 0 ? `Balance ${inr(balance)}` : 'Settled'}</Badge>
+                {(stay.guestPhone || stay.guestEmail) && <Badge tone="success">QR Portal Active</Badge>}
               </>
             )}
             {stay.status === 'checked_out' && (
               <>
-                <Badge tone="neutral">Checked out</Badge>
+                <Badge tone="neutral">Checked out · Access Revoked</Badge>
                 {cleanerAssigned ? <Badge tone="success">Turnover assigned · Vikram S.</Badge> : <Badge tone="warning">Turnover pending · Needs HK</Badge>}
               </>
             )}
@@ -281,11 +376,11 @@ function StayRow({ stay, onDialog }: { stay: StayRecord; onDialog: (kind: 'verif
                   size="sm"
                   variant="accent"
                   iconLeft={LogIn}
-                  disabled={blocker !== null}
+                  disabled={blocker !== null || checkingIn}
                   title={blocker ?? undefined}
-                  onClick={() => fdAction((s) => checkIn(s, stay.id))}
+                  onClick={handleCheckInClick}
                 >
-                  Check in
+                  {checkingIn ? 'Checking in...' : 'Check in'}
                 </Button>
                 {hint && <span className="text-[11px] text-mist-400">{hint}</span>}
               </div>
@@ -500,27 +595,40 @@ function VerifyIdDialog({ stay, onClose }: { stay: StayRecord; onClose: () => vo
 }
 
 function AddStayDialog({ onClose }: { onClose: () => void }) {
-  const { state, fdAction } = useDemo();
+  const { state, fdAction, currentHotelSlug } = useDemo();
   const rooms = state.frontDesk?.rooms ?? [];
   const stays = state.frontDesk?.stays ?? [];
   const eligible = rooms
     .filter((r) => !r.occupied && r.readiness !== 'out_of_order' && !stays.some((st) => st.room === r.no && st.status !== 'checked_out'))
-    .sort((a, b) => a.no.localeCompare(b.no));
+    .sort((a, b) => a.no.localeCompare(b.no, undefined, { numeric: true }));
 
   const [guest, setGuest] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [room, setRoom] = useState(eligible[0]?.no ?? '');
   const [roomType, setRoomType] = useState(eligible[0] ? (catalogTypeName(eligible[0].no) ?? ROOM_TYPES[0].name) : ROOM_TYPES[0].name);
-  const [category, setCategory] = useState<StayCategory>('arriving');
+  const [category, setCategory] = useState<StayCategory>('in_house');
   const [roomStatus, setRoomStatus] = useState<'ready' | 'inspection_pending'>('ready');
   const [idVerified, setIdVerified] = useState(false);
   const [earlyCheckIn, setEarlyCheckIn] = useState(false);
   const [balance, setBalance] = useState('0');
   const [vip, setVip] = useState(false);
   const [tried, setTried] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!room && eligible[0]) {
+      setRoom(eligible[0].no);
+      const t = catalogTypeName(eligible[0].no);
+      if (t) setRoomType(t);
+    }
+  }, [eligible, room]);
 
   const arrivalsOnly = category !== 'arriving';
   const guestOk = guest.trim().length >= 2;
+  const contactValidation = validateStayContact(guestEmail, guestPhone);
+  const contactOk = !contactValidation.error;
   const balanceNum = Number(balance);
   const balanceOk = balance.trim() !== '' && Number.isFinite(balanceNum) && balanceNum >= 0;
 
@@ -530,25 +638,58 @@ function AddStayDialog({ onClose }: { onClose: () => void }) {
     if (t) setRoomType(t);
   }
 
-  function submit() {
+  async function submit() {
     setTried(true);
     setError(null);
-    if (!guestOk || !balanceOk || !room) return;
-    const err = fdAction((s) =>
-      addStay(s, {
-        guest,
-        room,
-        roomType,
-        category,
-        roomStatus,
-        idVerified,
-        earlyCheckIn,
-        folioBalance: balanceNum,
-        vip,
-      }),
-    );
-    if (err) setError(err);
-    else onClose();
+    if (!guestOk || !contactOk || !balanceOk || !room || submitting) return;
+
+    setSubmitting(true);
+    try {
+      let backendBookingRef: string | undefined;
+      if (currentHotelSlug) {
+        const roomObj = rooms.find((r) => r.no === room);
+        const synced = (await syncHotelStay(currentHotelSlug, {
+          roomNumber: room,
+          floor: roomObj?.floor,
+          typeFull: roomType,
+          guestName: guest.trim(),
+          guestEmail: contactValidation.email,
+          guestPhone: contactValidation.phone,
+          category,
+          readiness: category === 'arriving' ? roomStatus : 'ready',
+          folioBalance: balanceNum > 0 ? `₹${balanceNum.toFixed(2)}` : undefined,
+          vip,
+        })) as { bookingRef?: string } | null;
+        backendBookingRef = synced?.bookingRef ?? undefined;
+      }
+
+      const err = fdAction((s) =>
+        addStay(s, {
+          guest,
+          guestEmail: contactValidation.email,
+          guestPhone: contactValidation.phone,
+          bookingRef: backendBookingRef,
+          room,
+          roomType,
+          category,
+          roomStatus,
+          idVerified,
+          earlyCheckIn,
+          folioBalance: balanceNum,
+          vip,
+        }),
+      );
+      if (err) setError(err);
+      else onClose();
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : 'Unable to register stay with the backend.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const Seg = ({ options, value, onChange, disabled }: { options: Array<{ id: string; label: string }>; value: string; onChange: (id: string) => void; disabled?: boolean }) => (
@@ -571,27 +712,65 @@ function AddStayDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal
       title="Add Stay"
-      description="Frontend test booking. It appears in Stays, the Rooms board and the filter counts straight away."
+      description="Register guest details for their assigned room. Phone number or email (either or both) enables passwordless QR Guest Portal login."
       onClose={onClose}
       footer={
         <>
-          <Button variant="subtle" onClick={onClose}>
+          <Button variant="subtle" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button variant="accent" iconLeft={Plus} disabled={eligible.length === 0} onClick={submit}>
-            Add stay
+          <Button variant="accent" iconLeft={Plus} disabled={eligible.length === 0 || submitting} onClick={submit}>
+            {submitting ? 'Registering...' : 'Add stay'}
           </Button>
         </>
       }
     >
       {eligible.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/15 px-3 py-6 text-center text-sm text-mist-300">No vacant rooms are free to assign right now. Check out a guest or reset the demo.</p>
+        <p className="rounded-xl border border-dashed border-white/15 px-3 py-6 text-center text-sm text-mist-300">No vacant rooms are free to assign right now. Check out a guest or add rooms in the Rooms tab.</p>
       ) : (
         <div className="space-y-4 text-sm">
           <div>
             <FieldLabel htmlFor="add-guest">Guest name</FieldLabel>
             <input id="add-guest" value={guest} onChange={(e) => setGuest(e.target.value)} placeholder="e.g. Anya Sharma" className="field w-full" aria-invalid={tried && !guestOk} />
             {tried && !guestOk && <p className="mt-1 text-xs text-rose-400">Enter the guest name.</p>}
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-white">Room QR Login Contact</span>
+              <span className="text-[11px] text-amber-300">Phone OR Email required (one or both)</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <FieldLabel htmlFor="add-phone">Phone number</FieldLabel>
+                <input
+                  id="add-phone"
+                  type="tel"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  placeholder="e.g. +91 98765 43210"
+                  className="field w-full"
+                  aria-invalid={tried && !contactOk}
+                />
+              </div>
+              <div>
+                <FieldLabel htmlFor="add-email">Email address</FieldLabel>
+                <input
+                  id="add-email"
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="e.g. anya@example.com"
+                  className="field w-full"
+                  aria-invalid={tried && !contactOk}
+                />
+              </div>
+            </div>
+            {tried && contactValidation.error && (
+              <p role="alert" className="text-xs text-rose-400">
+                {contactValidation.error}
+              </p>
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -690,11 +869,13 @@ function AddStayDialog({ onClose }: { onClose: () => void }) {
 
 function CheckoutDialog({
   stay,
+  busy = false,
   onClose,
   onSettle,
   onCheckout,
 }: {
   stay: StayRecord;
+  busy?: boolean;
   onClose: () => void;
   onSettle: () => void;
   onCheckout: () => void;
@@ -712,16 +893,16 @@ function CheckoutDialog({
       onClose={onClose}
       footer={
         <>
-          <Button variant="subtle" onClick={onClose}>
+          <Button variant="subtle" onClick={onClose} disabled={busy}>
             Close
           </Button>
           {balance > 0 && (
-            <Button variant="ghost" onClick={onSettle} iconLeft={Folder}>
+            <Button variant="ghost" onClick={onSettle} disabled={busy} iconLeft={Folder}>
               Collect {inr(balance)} · card {stay.cardMask}
             </Button>
           )}
-          <Button variant="accent" iconLeft={LogOut} disabled={blockers.length > 0} onClick={onCheckout}>
-            Check out and revoke QR session
+          <Button variant="accent" iconLeft={LogOut} disabled={blockers.length > 0 || busy} onClick={onCheckout}>
+            {busy ? 'Checking out...' : 'Check out and revoke QR session'}
           </Button>
         </>
       }
@@ -767,7 +948,7 @@ function CheckoutDialog({
   );
 }
 
-function MoveDialog({ stay, onClose, onConfirm }: { stay: StayRecord; onClose: () => void; onConfirm: (toRoom: string, reason: string, roomType: string) => void }) {
+function MoveDialog({ stay, busy = false, onClose, onConfirm }: { stay: StayRecord; busy?: boolean; onClose: () => void; onConfirm: (toRoom: string, reason: string, roomType: string) => void }) {
   const { state } = useDemo();
   const reserved = new Set((state.frontDesk?.stays ?? []).filter((st) => st.status === 'expected').map((st) => st.room));
   const candidates = (state.frontDesk?.rooms ?? []).filter((r) => !r.occupied && r.readiness === 'ready' && !r.dnd && r.no !== stay.room && !reserved.has(r.no));
@@ -790,11 +971,11 @@ function MoveDialog({ stay, onClose, onConfirm }: { stay: StayRecord; onClose: (
       onClose={onClose}
       footer={
         <>
-          <Button variant="subtle" onClick={onClose}>
+          <Button variant="subtle" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="accent" iconLeft={ArrowRightLeft} disabled={!toRoom} onClick={() => onConfirm(toRoom, reason, roomType)}>
-            Confirm move
+          <Button variant="accent" iconLeft={ArrowRightLeft} disabled={!toRoom || busy} onClick={() => onConfirm(toRoom, reason, roomType)}>
+            {busy ? 'Moving...' : 'Confirm move'}
           </Button>
         </>
       }

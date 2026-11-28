@@ -42,9 +42,9 @@ export default async function HotelRolePage({
   const sParams = searchParams ? await searchParams : {};
 
   if (role === 'guest') {
-    const room = sParams.room || '402';
+    const room = sParams.room || '';
     const token = sParams.token || '';
-    return <GuestPortalPreview room={room} token={token} />;
+    return <GuestPortalPreview room={room} token={token} hotelSlug={slug} />;
   }
 
   const meta = roleBySlug(role);
