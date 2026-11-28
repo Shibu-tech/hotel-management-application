@@ -1,6 +1,8 @@
 package com.hotel.backend.security;
 
+import com.hotel.backend.model.Hotel;
 import com.hotel.backend.model.Role;
+import com.hotel.backend.model.Room;
 import com.hotel.backend.model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -59,6 +61,38 @@ public class JwtUtil {
                 .expiration(expiryDate)
                 .signWith(key)
                 .compact();
+    }
+
+    /**
+     * Generates a passwordless HttpOnly session JWT strictly bound to an active hotel room stay.
+     * Subject is the verified normalized email or phone digits; stayRef invalidates on checkout or room move.
+     */
+    public String generateGuestToken(Hotel hotel, Room room, String normalizedIdentifier) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tokenType", "GUEST_PORTAL");
+        claims.put("role", Role.GUEST.name());
+        claims.put("hotelId", hotel.getId());
+        claims.put("hotelSlug", hotel.getSlug());
+        claims.put("roomNumber", room.getRoomNumber());
+        claims.put("stayRef", room.getBookingRef() != null ? room.getBookingRef() : "");
+        claims.put("guestName", room.getGuestName() != null ? room.getGuestName() : "Guest");
+
+        Date now = new Date();
+        // Guest stay token capped at max(expirationMs, 7 days) since live checkout/room-move revokes immediately
+        long guestValidityMs = Math.max(expirationMs, 7L * 24 * 60 * 60 * 1000);
+        Date expiryDate = new Date(now.getTime() + guestValidityMs);
+
+        return Jwts.builder()
+                .subject(normalizedIdentifier)
+                .claims(claims)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key)
+                .compact();
+    }
+
+    public boolean isGuestToken(Claims claims) {
+        return claims != null && "GUEST_PORTAL".equals(claims.get("tokenType", String.class));
     }
 
     public Claims extractAllClaims(String token) {

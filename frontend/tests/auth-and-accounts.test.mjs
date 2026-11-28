@@ -353,3 +353,167 @@ describe('6. Browser Back/Forward Navigation, Logout Revocation & bfcache Harden
     assert.match(nextConfigSrc, /source:\s*['"]\/hotel\/:path\*['"]/);
   });
 });
+
+
+describe('7. Front Desk Stay Contact, Passwordless Guest QR Login & Auto-Revocation', () => {
+  const origFetch = globalThis.fetch;
+  const origDocument = globalThis.document;
+
+  beforeEach(() => {
+    globalThis.document = { cookie: 'XSRF-TOKEN=guest-csrf-token-789' };
+  });
+
+  afterEach(() => {
+    globalThis.fetch = origFetch;
+    globalThis.document = origDocument;
+  });
+
+  it('guestAuthApi.ts performs passwordless email/phone login, session check, checkout & logout', async () => {
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url, method: init?.method, body: init?.body, headers: init?.headers, credentials: init?.credentials });
+      const target = String(url);
+      if (target.endsWith('/guest-auth/login')) {
+        return new Response(
+          JSON.stringify({
+            hotelId: 1,
+            hotelName: 'The Grand ADP',
+            hotelSlug: 'grand-adp',
+            roomNumber: '305',
+            guestName: 'Riku',
+            guestPhone: '+91 98765 43210',
+            redirectUrl: '/hotel/grand-adp/guest?room=305',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (target.endsWith('/guest-auth/session')) {
+        return new Response(
+          JSON.stringify({ message: 'Your stay has ended. Room portal access has been revoked.' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ message: 'OK' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    const {
+      loginGuestWithIdentifier,
+      fetchGuestSession,
+      checkoutGuestPortalSession,
+      logoutGuestPortalSession,
+    } = await import('../src/lib/guestAuthApi.ts');
+
+    const session = await loginGuestWithIdentifier(1, '  +91 98765 43210  ');
+    assert.equal(session.roomNumber, '305');
+    assert.equal(session.redirectUrl, '/hotel/grand-adp/guest?room=305');
+
+    const loginBody = JSON.parse(calls[0].body);
+    assert.deepEqual(loginBody, { hotelId: 1, identifier: '+91 98765 43210' });
+    assert.equal('password' in loginBody, false);
+
+    const check = await fetchGuestSession();
+    assert.equal(check.status, 'revoked');
+    assert.match(check.message, /revoked/i);
+
+    await checkoutGuestPortalSession();
+    assert.match(String(calls[2].url), /\/guest-auth\/checkout$/);
+    assert.equal(calls[2].headers.get('X-XSRF-TOKEN'), 'guest-csrf-token-789');
+
+    await logoutGuestPortalSession();
+    assert.match(String(calls[3].url), /\/guest-auth\/logout$/);
+    assert.equal(calls[3].credentials, 'include');
+  });
+
+  it('hotelStaysApi.ts syncs add-stay, check-in, checkout, and room moves to backend', async () => {
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), method: init?.method, body: init?.body });
+      return new Response(JSON.stringify({ no: '305' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    const {
+      syncHotelStay,
+      checkInHotelStay,
+      checkOutHotelStay,
+      moveHotelStay,
+    } = await import('../src/lib/hotelStaysApi.ts');
+
+    await syncHotelStay('grand-adp', {
+      roomNumber: '305',
+      guestName: 'Phone Only Guest',
+      guestPhone: '+91 9876543210',
+      category: 'in_house',
+    });
+    await checkInHotelStay('grand-adp', '305');
+    await checkOutHotelStay('grand-adp', '305');
+    await moveHotelStay('grand-adp', { fromRoomNumber: '305', toRoomNumber: '402' });
+
+    assert.match(calls[0].url, /\/hotels\/grand-adp\/stays$/);
+    assert.equal(JSON.parse(calls[0].body).guestPhone, '+91 9876543210');
+    assert.match(calls[1].url, /\/hotels\/grand-adp\/stays\/305\/check-in$/);
+    assert.match(calls[2].url, /\/hotels\/grand-adp\/stays\/305\/check-out$/);
+    assert.match(calls[3].url, /\/hotels\/grand-adp\/stays\/move$/);
+  });
+
+  it('Front Desk Add Stay enforces compulsory email-or-phone and syncs lifecycle transitions', () => {
+    const frontDeskSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/frontDesk.ts'), 'utf8');
+    const staysPanelSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'components/frontdesk/StaysPanel.tsx'), 'utf8');
+
+    assert.match(frontDeskSrc, /export function validateStayContact\(/);
+    assert.match(frontDeskSrc, /if \(!email && !phone\)/);
+    assert.match(frontDeskSrc, /const contact = validateStayContact\(input\.guestEmail, input\.guestPhone\)/);
+    assert.match(frontDeskSrc, /stayEmailsMatch\(st\.guestEmail, contact\.email\)/);
+    assert.match(frontDeskSrc, /stayPhonesMatch\(st\.guestPhone, contact\.phone\)/);
+    assert.match(frontDeskSrc, /guestEmail: undefined, guestPhone: undefined, accessPin: undefined/);
+
+    assert.match(staysPanelSrc, /validateStayContact\(guestEmail, guestPhone\)/);
+    assert.match(staysPanelSrc, /syncHotelStay\(/);
+    assert.match(staysPanelSrc, /checkInHotelStay\(/);
+    assert.match(staysPanelSrc, /checkOutHotelStay\(/);
+    assert.match(staysPanelSrc, /moveHotelStay\(/);
+  });
+
+  it('[hotelId] QR scan page renders minimal passwordless GuestQrLoginView without password field', () => {
+    const hotelQrPageSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'app/[hotelId]/page.tsx'), 'utf8');
+    const qrLoginSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'components/login/GuestQrLoginView.tsx'), 'utf8');
+
+    assert.match(hotelQrPageSrc, /import \{ GuestQrLoginView \}/);
+    assert.match(hotelQrPageSrc, /return <GuestQrLoginView hotel=\{hotel!\} \/>/);
+    assert.doesNotMatch(hotelQrPageSrc, /PortalLoginView lockedHotel/);
+
+    assert.match(qrLoginSrc, /id="guest-qr-identifier"/);
+    assert.match(qrLoginSrc, /loginGuestWithIdentifier\(hotel\.id, trimmed\)/);
+    assert.match(qrLoginSrc, /router\.replace\(session\.redirectUrl\)/);
+    assert.doesNotMatch(qrLoginSrc, /type="password"/);
+  });
+
+  it('Guest Portal verifies backend guest session, prevents room bypass, displays registered contact & auto-revokes', () => {
+    const guestRouteSrc = fs.readFileSync(
+      path.join(FRONTEND_SRC, 'app/hotel/[slug]/[role]/page.tsx'),
+      'utf8',
+    );
+    const previewSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'components/shared/GuestPortalPreview.tsx'), 'utf8');
+    const profileSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'components/guest/GuestProfileSubtab.tsx'), 'utf8');
+    const storeSrc = fs.readFileSync(path.join(FRONTEND_SRC, 'lib/store.tsx'), 'utf8');
+
+    assert.match(guestRouteSrc, /<GuestPortalPreview room=\{room\} token=\{token\} hotelSlug=\{slug\} \/>/);
+
+    assert.match(previewSrc, /const isAuthenticatedGuestRoute = Boolean\(hotelSlug\)/);
+    assert.match(previewSrc, /fetchGuestSession\(\)/);
+    assert.match(previewSrc, /activeSession\.roomNumber !== propRoom/);
+    assert.match(previewSrc, /addEventListener\('focus'/);
+    assert.match(previewSrc, /addEventListener\('visibilitychange'/);
+    assert.match(previewSrc, /logoutGuestPortalSession\(\)/);
+
+    assert.match(profileSrc, /guestEmail \?\? stay\?\.guestEmail/);
+    assert.match(profileSrc, /guestPhone \?\? stay\?\.guestPhone/);
+    assert.match(storeSrc, /checkoutGuestPortalSession\(\)/);
+    assert.match(storeSrc, /reconcileFrontDesk\(/);
+  });
+});

@@ -21,6 +21,7 @@ import {
   addHotelFloor,
   deleteHotelFloor,
 } from '@/lib/hotelRoomsApi';
+import { checkoutGuestPortalSession } from '@/lib/guestAuthApi';
 import { INITIAL_DINING_CATEGORIES, INITIAL_DINING_MENU } from '@/components/guest/diningData';
 import { seedEventsConfig } from '@/components/guest/eventsData';
 import type { EventsCelebrationsConfig } from '@/types/demo';
@@ -128,6 +129,9 @@ import type {
   GuestIncidentAttachment,
   CustomFloorInfo,
   CustomRoomSpec,
+  FrontDeskState,
+  RoomRecord,
+  StayRecord,
 } from '@/types/demo';
 
 import { migrateOperationalReferences, nextOperationalReference, taskReferenceInitial } from './operational-references';
@@ -940,18 +944,131 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           wing: f.wing,
         }));
 
+        const reconcileFrontDesk = (
+          existingFd: FrontDeskState | undefined,
+          isDefaultTenant: boolean,
+        ): FrontDeskState => {
+          const seedStayIds = new Set(frontDeskSeed.stays.map((s) => s.id));
+          const backendRoomNos = new Set(backendRooms.map((br) => br.no));
+          const baseRooms: RoomRecord[] = isDefaultTenant
+            ? [...(existingFd?.rooms ?? frontDeskSeed.rooms)]
+            : [...(existingFd?.rooms ?? [])];
+
+          const roomMap = new Map<string, RoomRecord>();
+          for (const r of baseRooms) {
+            if (isDefaultTenant || backendRoomNos.has(r.no)) {
+              roomMap.set(r.no, r);
+            }
+          }
+          for (const br of backendRooms) {
+            const prevRoom = roomMap.get(br.no);
+            roomMap.set(br.no, {
+              no: br.no,
+              floor: br.floor,
+              occupied: Boolean(br.occupied),
+              readiness: (br.readiness as Readiness) || prevRoom?.readiness || 'ready',
+              dnd: Boolean(br.dnd),
+              note: prevRoom?.note,
+            });
+          }
+
+          const baseStays: StayRecord[] = isDefaultTenant
+            ? [...(existingFd?.stays ?? frontDeskSeed.stays)]
+            : (existingFd?.stays ?? []).filter((s) => !seedStayIds.has(s.id));
+
+          const staysCopy = [...baseStays];
+          for (const br of backendRooms) {
+            const badge = String(br.badgeStatus || '');
+            const hasActiveBackendStay = Boolean(br.occupied) || (badge === 'EXPECTED' && Boolean(br.guestName));
+            const activeIdx = staysCopy.findIndex(
+              (s) => s.room === br.no && s.status !== 'checked_out',
+            );
+
+            if (hasActiveBackendStay) {
+              const parsedNights = parseInt(String(br.duration || '').replace(/\D+/g, ''), 10);
+              const nextStatus = br.occupied ? ('in_house' as const) : ('expected' as const);
+              if (activeIdx >= 0) {
+                const existing = staysCopy[activeIdx];
+                staysCopy[activeIdx] = {
+                  ...existing,
+                  guest: br.guestName?.trim() || existing.guest,
+                  guestPhone: br.guestPhone ?? existing.guestPhone,
+                  guestEmail: br.guestEmail ?? existing.guestEmail,
+                  bookingRef: br.bookingRef ?? existing.bookingRef,
+                  roomType: br.typeFull || br.typeTag || existing.roomType,
+                  arrival: br.checkInDate || existing.arrival,
+                  departure: br.checkOutDate || existing.departure,
+                  vip: br.vip ?? existing.vip,
+                  vipTier: br.vipTier ?? existing.vipTier,
+                  accessPin: br.pin ?? existing.accessPin,
+                  status: nextStatus,
+                  preCheckIn: br.occupied ? 'verified' : existing.preCheckIn,
+                  idChecked: br.occupied ? true : existing.idChecked,
+                };
+              } else {
+                staysCopy.unshift({
+                  id: `be-stay-${br.no}`,
+                  room: br.no,
+                  guest: br.guestName?.trim() || `Guest · Room ${br.no}`,
+                  guestPhone: br.guestPhone || undefined,
+                  guestEmail: br.guestEmail || undefined,
+                  bookingRef: br.bookingRef || undefined,
+                  roomType: br.typeFull || br.typeTag || 'Deluxe King',
+                  arrival: br.checkInDate || 'Today',
+                  departure: br.checkOutDate || 'Tomorrow',
+                  nights: Number.isFinite(parsedNights) && parsedNights > 0 ? parsedNights : 2,
+                  status: nextStatus,
+                  vip: Boolean(br.vip),
+                  vipTier: br.vipTier,
+                  guests: br.guestsCount ?? 2,
+                  preCheckIn: br.occupied ? 'verified' : 'none',
+                  idChecked: Boolean(br.occupied),
+                  paid: 0,
+                  cardMask: '****',
+                  accessPin: br.pin,
+                });
+              }
+            } else if (!br.guestName && !br.guestPhone && !br.guestEmail && activeIdx >= 0) {
+              // Backend room is vacant and contact cleared -> mark stale local active stay checked out
+              staysCopy[activeIdx] = {
+                ...staysCopy[activeIdx],
+                status: 'checked_out',
+                guestEmail: undefined,
+                guestPhone: undefined,
+                accessPin: undefined,
+              };
+            }
+          }
+
+          return {
+            stays: staysCopy,
+            rooms: Array.from(roomMap.values()),
+            sync: existingFd?.sync ?? (isDefaultTenant ? frontDeskSeed.sync : []),
+            complaints: existingFd?.complaints ?? (isDefaultTenant ? frontDeskSeed.complaints : []),
+          };
+        };
+
+        const occupiedBackendRooms = new Set(
+          backendRooms.filter((br) => Boolean(br.occupied)).map((br) => br.no),
+        );
+        const nextRevoked = (prev.revokedRooms ?? []).filter((rNo) => !occupiedBackendRooms.has(rNo));
+
         if (currentHotelSlug !== 'grand-adp') {
           return {
             ...prev,
+            revokedRooms: nextRevoked,
             customRooms: backendRooms,
             customFloors: backendFloors,
+            frontDesk: reconcileFrontDesk(prev.frontDesk, false),
           };
         }
 
         return {
           ...prev,
+          revokedRooms: nextRevoked,
           customRooms: backendRooms.length > 0 ? backendRooms : prev.customRooms,
           customFloors: backendFloors.length > 0 ? backendFloors : prev.customFloors,
+          frontDesk: backendRooms.length > 0 ? reconcileFrontDesk(prev.frontDesk, true) : prev.frontDesk,
         };
       });
     });
@@ -3517,10 +3634,25 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         tone: 'warning',
         room,
       };
+      void checkoutGuestPortalSession().catch(() => {});
       setState((prev) => ({
         ...prev,
         revokedRooms: prev.revokedRooms.includes(room) ? prev.revokedRooms : [...prev.revokedRooms, room],
         frontDesk: markCheckedOut(prev.frontDesk, room),
+        customRooms: (prev.customRooms ?? []).map((r) =>
+          r.no === room
+            ? {
+                ...r,
+                occupied: false,
+                readiness: 'dirty',
+                badgeStatus: 'READY',
+                guestName: undefined,
+                guestPhone: undefined,
+                guestEmail: undefined,
+                bookingRef: undefined,
+              }
+            : r,
+        ),
         items: { ...prev.items, task_fulfiller: [turnoverItem, ...prev.items.task_fulfiller] },
         feed: [
           { id: uid(), at: nowLabel(), role: 'Front Desk', text: `Express checkout · ${guestName} · Room ${room} · QR session revoked` },

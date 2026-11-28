@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   User,
   Mail,
@@ -24,7 +24,7 @@ import { useDemo } from '@/lib/store';
 import { GuestSectionHeader, GuestSheet } from '@/components/guest/guestUi';
 import type { GuestTabProps } from '@/components/guest/types';
 
-export function GuestProfileSubtab({ room, guestName }: GuestTabProps) {
+export function GuestProfileSubtab({ room, guestName, guestEmail, guestPhone }: GuestTabProps) {
   const { state, updateGuestProfile } = useDemo();
 
   // Find stay and preferences
@@ -36,9 +36,19 @@ export function GuestProfileSubtab({ room, guestName }: GuestTabProps) {
     personalInstructions: 'Extra down-feather pillows requested upon evening turndown service.',
   };
 
+  const resolvedEmail =
+    guestEmail ?? stay?.guestEmail ?? (!guestPhone && !stay ? 'elena.rostova@prestige-holdings.eu' : '');
+  const resolvedPhone =
+    guestPhone ?? stay?.guestPhone ?? (!guestEmail && !stay ? '+1 (555) 382-9014' : '');
+
   // State for editable profile
-  const [email, setEmail] = useState('elena.rostova@prestige-holdings.eu');
-  const [phone, setPhone] = useState('+1 (555) 382-9014');
+  const [email, setEmail] = useState(resolvedEmail);
+  const [phone, setPhone] = useState(resolvedPhone);
+
+  useEffect(() => {
+    setEmail(resolvedEmail);
+    setPhone(resolvedPhone);
+  }, [room, resolvedEmail, resolvedPhone]);
   const [preferredTemp, setPreferredTemp] = useState('21°C / 70°F');
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -46,6 +56,12 @@ export function GuestProfileSubtab({ room, guestName }: GuestTabProps) {
   const [formName, setFormName] = useState(guestName);
   const [formEmail, setFormEmail] = useState(email);
   const [formPhone, setFormPhone] = useState(phone);
+
+  useEffect(() => {
+    setFormName(guestName);
+    setFormEmail(email);
+    setFormPhone(phone);
+  }, [guestName, email, phone]);
   const [formTemp, setFormTemp] = useState(preferredTemp);
   const [formAllergies, setFormAllergies] = useState((prefs.allergies ?? []).join(', '));
   const [formDietary, setFormDietary] = useState((prefs.dietaryRestrictions ?? []).join(', '));

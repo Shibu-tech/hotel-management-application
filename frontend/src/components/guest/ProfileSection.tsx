@@ -7,7 +7,7 @@ import { MyBookingsSubtab } from './MyBookingsSubtab';
 import { MyFolioSubtab } from './MyFolioSubtab';
 import type { GuestTabProps, GuestProfileSubtab as ProfileSubtabType } from '@/components/guest/types';
 
-export function ProfileSection({ room, guestName, onNavigate, initialSubtab }: GuestTabProps) {
+export function ProfileSection({ room, guestName, guestEmail, guestPhone, onNavigate, initialSubtab }: GuestTabProps) {
   const [activeSubtab, setActiveSubtab] = useState<ProfileSubtabType>(
     initialSubtab === 'bookings'
       ? 'bookings'
@@ -55,7 +55,13 @@ export function ProfileSection({ room, guestName, onNavigate, initialSubtab }: G
 
       {/* Render Active Subsection */}
       {activeSubtab === 'profile_info' && (
-        <GuestProfileSubtab room={room} guestName={guestName} onNavigate={onNavigate} />
+        <GuestProfileSubtab
+          room={room}
+          guestName={guestName}
+          guestEmail={guestEmail}
+          guestPhone={guestPhone}
+          onNavigate={onNavigate}
+        />
       )}
       {activeSubtab === 'bookings' && (
         <MyBookingsSubtab room={room} guestName={guestName} onNavigate={onNavigate} />

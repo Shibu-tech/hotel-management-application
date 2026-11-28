@@ -52,6 +52,8 @@ export type GuestTabId =
 export interface GuestTabProps {
   room: string;
   guestName: string;
+  guestEmail?: string | null;
+  guestPhone?: string | null;
   onNavigate: (tab: GuestTabId, subtab?: string) => void;
   initialSubtab?: string;
 }

@@ -35,6 +35,7 @@ const nextConfig = {
       { source: '/admin/:path*', headers: noStoreHeaders },
       { source: '/hotel/:path*', headers: noStoreHeaders },
       { source: '/staff/:path*', headers: noStoreHeaders },
+      { source: '/guest/:path*', headers: noStoreHeaders },
     ];
   },
   async rewrites() {

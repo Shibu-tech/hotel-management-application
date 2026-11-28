@@ -277,7 +277,11 @@ export function settleBalance(s: DemoState, stayId: string): FdResult {
 export function markCheckedOut(fd: FrontDeskState, room: string): FrontDeskState {
   return {
     ...fd,
-    stays: fd.stays.map((st) => (st.room === room && st.status === 'in_house' ? { ...st, status: 'checked_out' as const } : st)),
+    stays: fd.stays.map((st) =>
+      st.room === room && st.status === 'in_house'
+        ? { ...st, status: 'checked_out' as const, guestEmail: undefined, guestPhone: undefined, accessPin: undefined }
+        : st,
+    ),
     rooms: patchRoom(fd.rooms, room, { occupied: false, readiness: 'dirty', dnd: false }),
   };
 }
@@ -381,8 +385,64 @@ export function markRoomReady(s: DemoState, roomNo: string): FdResult {
 
 export type StayCategory = 'arriving' | 'in_house' | 'departing';
 
+export interface ValidatedStayContact {
+  email?: string;
+  phone?: string;
+  error?: string;
+}
+
+export function extractPhoneDigits(raw?: string): string {
+  return (raw ?? '').replace(/\D/g, '');
+}
+
+export function stayEmailsMatch(a?: string, b?: string): boolean {
+  const ca = (a ?? '').trim().toLowerCase();
+  const cb = (b ?? '').trim().toLowerCase();
+  return Boolean(ca && cb && ca === cb);
+}
+
+export function stayPhonesMatch(a?: string, b?: string): boolean {
+  const da = extractPhoneDigits(a);
+  const db = extractPhoneDigits(b);
+  if (da.length < 7 || db.length < 7) return false;
+  if (da === db) return true;
+  if (da.length >= 10 && db.length >= 10) {
+    return da.slice(-10) === db.slice(-10);
+  }
+  return false;
+}
+
+/**
+ * Validates Add Stay contact details: at least one of email or phone number is compulsory,
+ * both may be provided, or only one may be provided.
+ */
+export function validateStayContact(rawEmail?: string, rawPhone?: string): ValidatedStayContact {
+  const email = (rawEmail ?? '').trim().toLowerCase();
+  const phone = (rawPhone ?? '').trim();
+
+  if (!email && !phone) {
+    return { error: 'Enter a phone number or an email address (at least one is required).' };
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return { error: 'Enter a valid email address.' };
+  }
+  if (phone) {
+    const digits = extractPhoneDigits(phone);
+    if (digits.length < 7 || digits.length > 15) {
+      return { error: 'Enter a valid phone number (7–15 digits).' };
+    }
+  }
+  return {
+    email: email || undefined,
+    phone: phone || undefined,
+  };
+}
+
 export interface AddStayInput {
   guest: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  bookingRef?: string;
   room: string;
   roomType: string;
   category: StayCategory;
@@ -400,6 +460,8 @@ export interface AddStayInput {
 export function addStay(s: DemoState, input: AddStayInput): FdResult {
   const guest = input.guest.trim();
   if (guest.length < 2) return { error: 'Enter the guest name.' };
+  const contact = validateStayContact(input.guestEmail, input.guestPhone);
+  if (contact.error) return { error: contact.error };
   if (!input.roomType.trim()) return { error: 'Choose a room type.' };
   const rec = s.frontDesk.rooms.find((r) => r.no === input.room);
   if (!rec) return { error: 'Choose a room from the inventory.' };
@@ -407,6 +469,17 @@ export function addStay(s: DemoState, input: AddStayInput): FdResult {
   const clash = s.frontDesk.stays.find((st) => st.room === rec.no && st.status !== 'checked_out');
   if (clash) return { error: `Room ${rec.no} already has ${clash.guest} (${clash.status === 'in_house' ? 'in house' : 'arriving'}).` };
   if (rec.occupied) return { error: `Room ${rec.no} is occupied. Choose a vacant room.` };
+
+  const contactClash = s.frontDesk.stays.find(
+    (st) =>
+      st.status !== 'checked_out' &&
+      ((contact.email && stayEmailsMatch(st.guestEmail, contact.email)) ||
+        (contact.phone && stayPhonesMatch(st.guestPhone, contact.phone))),
+  );
+  if (contactClash) {
+    return { error: `This email or phone number is already registered to Room ${contactClash.room} (${contactClash.guest}).` };
+  }
+
   if (!Number.isFinite(input.folioBalance) || input.folioBalance < 0) return { error: 'Folio balance must be 0 or more.' };
 
   const arriving = input.category === 'arriving';
@@ -421,6 +494,9 @@ export function addStay(s: DemoState, input: AddStayInput): FdResult {
     id: uid('stay'),
     room: rec.no,
     guest,
+    guestEmail: contact.email,
+    guestPhone: contact.phone,
+    bookingRef: input.bookingRef || `STAY-${Date.now().toString(36).toUpperCase()}`,
     vip: input.vip || undefined,
     roomType: input.roomType.trim(),
     arrival: `${fmtDay(arrivalIso)} · 14:00`,

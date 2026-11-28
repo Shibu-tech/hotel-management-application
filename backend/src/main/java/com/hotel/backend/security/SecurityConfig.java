@@ -59,7 +59,9 @@ public class SecurityConfig {
         // and non-browser Bearer token requests (which are immune to browser CSRF).
         RequestMatcher csrfIgnoreMatcher = (HttpServletRequest request) -> {
             String path = request.getRequestURI();
-            if ("/api/auth/login".equals(path) || "/api/auth/forgot-password".equals(path)) {
+            if ("/api/auth/login".equals(path)
+                    || "/api/auth/forgot-password".equals(path)
+                    || "/api/guest-auth/login".equals(path)) {
                 return true;
             }
             String authHeader = request.getHeader("Authorization");
@@ -97,6 +99,9 @@ public class SecurityConfig {
                 // Public health & auth entrypoints
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/forgot-password").permitAll()
+                // Guest QR Portal passwordless auth (verifies active room stay & HttpOnly hotel_guest_token cookie)
+                .requestMatchers(HttpMethod.POST, "/api/guest-auth/login", "/api/guest-auth/checkout", "/api/guest-auth/logout").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/guest-auth/session").permitAll()
                 // Public hotel directory / basic verification endpoints (non-sensitive)
                 .requestMatchers(HttpMethod.GET, "/api/hotels/public-list").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/hotels/*/public").permitAll()

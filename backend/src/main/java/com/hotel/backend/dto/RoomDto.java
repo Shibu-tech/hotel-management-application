@@ -73,6 +73,9 @@ public class RoomDto {
         } else if (room.isOccupied()) {
             dto.setStatusKind("occupied");
             dto.setStatusLabel(room.getGuestName() != null ? room.getGuestName().split(" ")[0] : "Occupied");
+        } else if ("EXPECTED".equalsIgnoreCase(room.getBadgeStatus()) && room.getGuestName() != null) {
+            dto.setStatusKind("checkin");
+            dto.setStatusLabel("Check-In · " + room.getGuestName().split(" ")[0]);
         } else {
             dto.setStatusKind("ready");
             dto.setStatusLabel("Ready");
