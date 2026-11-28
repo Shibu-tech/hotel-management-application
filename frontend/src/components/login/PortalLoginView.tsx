@@ -446,7 +446,7 @@ export function PortalLoginView({ lockedHotel }: PortalLoginViewProps = {}) {
       if (err instanceof ApiError) {
         setAuthError(err.message);
       } else if (err instanceof TypeError) {
-        setAuthError('Authentication server is unreachable. Please ensure the Spring Boot backend is running on port 8080.');
+        setAuthError('Authentication server is unreachable. Please verify network connectivity and that the backend is online.');
       } else {
         setAuthError(err instanceof Error ? err.message : 'Authentication failed.');
       }

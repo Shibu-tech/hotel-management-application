@@ -39,7 +39,9 @@ export class ApiError extends Error {
 }
 
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+  const trimmed = raw.replace(/\/+$/, '');
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 }
 
 /**
